@@ -3,59 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DESTINY: THE CELLAR</title>
+    <title>DESTINY: OS TERMINAL</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-    <div id="video-container" class="fullscreen hidden">
-        <video id="intro-video" src="assets/intro.mp4" playsinline></video>
-    </div>
-
-    <div id="screamer-overlay" class="fullscreen hidden">
-        <img id="screamer-img" src="assets/monster.png" alt="Monster">
-        <audio id="scream-sound" src="assets/scream.mp3"></audio>
-    </div>
-
-    <div id="main-menu" class="fullscreen">
-        <div class="menu-content">
-            <h1 class="glitch">DESTINY</h1>
-            <p class="subtitle">SYSTEM.READY</p>
-            <div class="menu-buttons">
-                <button id="btn-start" class="repo-btn">ПРИНЯТЬ СУДЬБУ</button>
-                <button class="repo-btn" onclick="alert('Settings Open')">НАСТРОЙКИ</button>
-                <button class="repo-btn" onclick="window.close()">ВЫХОД</button>
+    <div id="main-menu" class="overlay">
+        <div class="repo-terminal">
+            <h1 class="glitch" data-text="DESTINY">DESTINY</h1>
+            <div class="line"></div>
+            <div class="menu-options">
+                <button id="btn-start" class="repo-btn">INIT_SESSION()</button>
+                <button class="repo-btn" onclick="alert('v1.0.4-beta')">VERSION_INFO</button>
+                <button class="repo-btn" onclick="window.close()">SHUTDOWN</button>
             </div>
+            <div class="footer">USER: UNKNOWN | LOCATION: THE_CELLAR</div>
         </div>
     </div>
 
-    <div id="game-hud" class="fullscreen hidden">
+    <div id="pause-menu" class="overlay hidden">
+        <div class="repo-terminal small">
+            <h2>SYSTEM_PAUSED</h2>
+            <button id="btn-resume" class="repo-btn">RESUME</button>
+            <button class="repo-btn" onclick="location.reload()">RESTART</button>
+        </div>
+    </div>
+
+    <div id="game-hud" class="hidden">
         <div id="crosshair"></div>
         <div id="interaction-prompt"></div>
-
-        <div id="status-panel" class="repo-panel">
-            <div class="stat-label">STAMINA.UNIT</div>
-            <div class="bar-bg"><div id="stamina-bar"></div></div>
+        
+        <div class="hud-bottom-left">
+            <div class="label">BIOMETRICS: <span id="stamina-val">100%</span></div>
+            <div class="bar-container"><div id="stamina-bar"></div></div>
         </div>
 
-        <div id="inventory-panel" class="repo-panel">
-            <div class="stat-label">STORAGE</div>
-            <ul id="inventory-list">
-                <li>- EMPTY -</li>
-            </ul>
+        <div class="hud-bottom-right">
+            <div class="label">DATABASE_ITEMS:</div>
+            <ul id="inventory-list"></ul>
         </div>
     </div>
 
     <canvas id="game-canvas"></canvas>
 
     <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
-            }
-        }
+        { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
     </script>
-    
     <script type="module" src="script.js"></script>
 </body>
 </html>
