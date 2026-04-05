@@ -2,52 +2,37 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DESTINY: OS TERMINAL</title>
+    <title>DESTINY: REPO EDITION</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
 </head>
 <body>
     <div id="main-menu" class="overlay">
-        <div class="repo-terminal">
-            <h1 class="glitch" data-text="DESTINY">DESTINY</h1>
-            <div class="line"></div>
-            <div class="menu-options">
-                <button id="btn-start" class="repo-btn">INIT_SESSION()</button>
-                <button class="repo-btn" onclick="alert('v1.0.4-beta')">VERSION_INFO</button>
-                <button class="repo-btn" onclick="window.close()">SHUTDOWN</button>
-            </div>
-            <div class="footer">USER: UNKNOWN | LOCATION: THE_CELLAR</div>
+        <div class="terminal">
+            <h1 class="glitch">DESTINY</h1>
+            <div class="status">SYSTEM_STATUS: READY</div>
+            <button id="btn-start" class="repo-btn">INITIALIZE_GAME</button>
         </div>
     </div>
 
     <div id="pause-menu" class="overlay hidden">
-        <div class="repo-terminal small">
-            <h2>SYSTEM_PAUSED</h2>
-            <button id="btn-resume" class="repo-btn">RESUME</button>
-            <button class="repo-btn" onclick="location.reload()">RESTART</button>
+        <div class="terminal small">
+            <h2>PAUSED</h2>
+            <button id="btn-resume" class="repo-btn">CONTINUE</button>
+            <button class="repo-btn" onclick="location.reload()">REBOOT</button>
         </div>
     </div>
 
     <div id="game-hud" class="hidden">
         <div id="crosshair"></div>
-        <div id="interaction-prompt"></div>
-        
-        <div class="hud-bottom-left">
-            <div class="label">BIOMETRICS: <span id="stamina-val">100%</span></div>
-            <div class="bar-container"><div id="stamina-bar"></div></div>
-        </div>
-
-        <div class="hud-bottom-right">
-            <div class="label">DATABASE_ITEMS:</div>
-            <ul id="inventory-list"></ul>
+        <div id="interaction"></div>
+        <div class="stats">
+            <div class="label">STAMINA</div>
+            <div class="bar"><div id="stamina-fill"></div></div>
         </div>
     </div>
 
     <canvas id="game-canvas"></canvas>
-
-    <script type="importmap">
-        { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
-    </script>
-    <script type="module" src="script.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
