@@ -20,10 +20,10 @@
     <div id="main-menu" class="fullscreen">
         <div class="menu-content">
             <h1 class="glitch">DESTINY</h1>
-            <p class="subtitle">WEBGL_CORE_RUNNING</p>
+            <p class="subtitle">SYSTEM.READY</p>
             <div class="menu-buttons">
                 <button id="btn-start" class="repo-btn">ПРИНЯТЬ СУДЬБУ</button>
-                <button id="btn-settings" class="repo-btn">НАСТРОЙКИ</button>
+                <button class="repo-btn" onclick="alert('Settings Open')">НАСТРОЙКИ</button>
                 <button class="repo-btn" onclick="window.close()">ВЫХОД</button>
             </div>
         </div>
@@ -34,13 +34,12 @@
         <div id="interaction-prompt"></div>
 
         <div id="status-panel" class="repo-panel">
-            <div class="stat-label">STAMINA.OS</div>
+            <div class="stat-label">STAMINA.UNIT</div>
             <div class="bar-bg"><div id="stamina-bar"></div></div>
-            <div class="stat-label" style="margin-top: 5px;">STATUS: ACTIVE</div>
         </div>
 
         <div id="inventory-panel" class="repo-panel">
-            <div class="stat-label">INVENTORY_DATA</div>
+            <div class="stat-label">STORAGE</div>
             <ul id="inventory-list">
                 <li>- EMPTY -</li>
             </ul>
@@ -56,6 +55,7 @@
             }
         }
     </script>
+    
     <script type="module" src="script.js"></script>
 </body>
 </html>
