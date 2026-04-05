@@ -3,60 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DESTINY: THE VOID ROAD</title>
+    <title>DESTINY: THE CELLAR</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="vignette"></div>
-    <div id="noise"></div>
-    <div id="flash-overlay"></div>
+    <div id="video-container" class="fullscreen hidden">
+        <video id="intro-video" src="assets/intro.mp4" playsinline></video>
+    </div>
 
-    <div id="main-menu" class="ui-wrapper">
+    <div id="screamer-overlay" class="fullscreen hidden">
+        <img id="screamer-img" src="assets/monster.png" alt="Monster">
+        <audio id="scream-sound" src="assets/scream.mp3"></audio>
+    </div>
+
+    <div id="main-menu" class="fullscreen">
         <div class="menu-content">
             <h1 class="glitch" data-text="DESTINY">DESTINY</h1>
-            <div class="menu-stats">МОНЕТЫ: <span id="menu-coins">0</span></div>
-            <nav class="buttons">
-                <button class="btn" id="btn-play">ПРИНЯТЬ СУДЬБУ</button>
-                <button class="btn" id="btn-shop">МАГАЗИН</button>
-                <button class="btn" id="btn-settings">НАСТРОЙКИ</button>
-                <button class="btn" onclick="window.close()">ВЫХОД</button>
-            </nav>
-        </div>
-    </div>
-
-    <div id="shop-screen" class="ui-wrapper hidden">
-        <div class="menu-content">
-            <h2>ЧЕРНЫЙ РЫНОК</h2>
-            <div class="shop-grid">
-                <div class="shop-item">
-                    <span>ЛИЗОСОМЫ (БЕГ +15%)</span>
-                    <button class="btn-buy" data-item="speed" data-price="50">50 💰</button>
-                </div>
-                <div class="shop-item">
-                    <span>ЛЕГКИЕ (СТАМИНА +20%)</span>
-                    <button class="btn-buy" data-item="stamina" data-price="70">70 💰</button>
-                </div>
-                <div class="shop-item">
-                    <span>ГАЛОГЕН (СВЕТ +30%)</span>
-                    <button class="btn-buy" data-item="light" data-price="100">100 💰</button>
-                </div>
+            <p class="subtitle">SYSTEM REQUIRED: WEBGL 2.0</p>
+            <div class="menu-buttons">
+                <button id="btn-start" class="repo-btn">ПРИНЯТЬ СУДЬБУ</button>
+                <button id="btn-settings" class="repo-btn">НАСТРОЙКИ</button>
+                <button class="repo-btn" onclick="window.close()">ВЫХОД</button>
             </div>
-            <button class="btn" id="btn-back">НАЗАД</button>
         </div>
     </div>
 
-    <div id="hud">
-        <div class="stamina-container">
-            <div id="stamina-bar"></div>
-        </div>
-        <div class="coins-display">💰 <span id="game-coins">0</span></div>
-        <div id="interaction-label"></div>
-    </div>
+    <div id="game-hud" class="fullscreen hidden">
+        <div id="crosshair"></div>
+        
+        <div id="interaction-prompt"></div>
 
-    <div id="death-screen" class="ui-wrapper hidden">
-        <div class="menu-content">
-            <h2 class="death-title">ВЫ СТАЛИ ЧАСТЬЮ ТЬМЫ</h2>
-            <button class="btn" onclick="location.reload()">ЕЩЕ РАЗ</button>
+        <div id="status-panel">
+            <div class="stat-block">
+                <div class="stat-label">SYSTEM.STAMINA</div>
+                <div class="bar-bg"><div id="stamina-bar"></div></div>
+            </div>
+            <div class="stat-block">
+                <div class="stat-label">CONDITION: NORMAL</div>
+            </div>
+        </div>
+
+        <div id="inventory-panel">
+            <div class="stat-label" style="text-align: right;">INVENTORY</div>
+            <ul id="inventory-list">
+                <li style="color: #555;">ПУСТО</li>
+            </ul>
         </div>
     </div>
 
