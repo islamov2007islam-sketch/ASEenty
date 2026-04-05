@@ -1,307 +1,345 @@
 import * as THREE from 'three';
 
-// === КОНФИГУРАЦИЯ И СОСТОЯНИЕ ===
-const STATE = {
-    coins: parseInt(localStorage.getItem('destiny_coins')) || 0,
-    upgrades: JSON.parse(localStorage.getItem('destiny_upgrades')) || { speed: 1, stamina: 1, light: 1 },
-    stamina: 100,
-    isRunning: false,
-    inGame: false,
-    isDead: false,
-    monsterAlert: 0 // 0 - патруль, 1 - преследование
-};
-
-// Настройки баланса
+// === КОНФИГУРАЦИЯ ИГРЫ ===
 const CONFIG = {
-    baseSpeed: 0.12,
-    runMultiplier: 1.6,
-    staminaDepletion: 0.4,
-    staminaRegen: 0.2,
-    monsterSpeed: 0.09
+    speed: 4.0,           // Базовая скорость
+    runSpeed: 7.0,        // Скорость бега
+    inertia: 0.15,        // Инерция (Phasmophobia style)
+    mouseSens: 0.002,     // Чувствительность мыши
+    staminaDrain: 20,     // Трата выносливости в секунду
+    staminaRegen: 10      // Восстановление
 };
 
-// === ИНИЦИАЛИЗАЦИЯ ДВИЖКА ===
-const canvas = document.querySelector('#game-canvas');
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = true;
+// === ПЕРЕМЕННЫЕ ===
+let scene, camera, renderer, clock;
+let isGameRunning = false;
+let keys = { w: false, a: false, s: false, d: false, shift: false, e: false };
+let velocity = new THREE.Vector3();
+let playerDirection = new THREE.Vector3();
+let stamina = 100;
+let inventory = [];
+let interactionTarget = null;
 
-const clock = new THREE.Clock();
-const raycaster = new THREE.Raycaster();
-const walls = [];
+// Коллизии (стены)
+const wallBoundingBoxes = [];
+const playerBox = new THREE.Box3();
 
-// === ОСВЕЩЕНИЕ И ТУМАН ===
-scene.background = new THREE.Color(0x000000);
-scene.fog = new THREE.FogExp2(0x000000, 0.15);
+// Элементы UI
+const uiMainMenu = document.getElementById('main-menu');
+const uiVideoContainer = document.getElementById('video-container');
+const uiGameHud = document.getElementById('game-hud');
+const introVideo = document.getElementById('intro-video');
+const interactionPrompt = document.getElementById('interaction-prompt');
+const staminaBar = document.getElementById('stamina-bar');
+const inventoryList = document.getElementById('inventory-list');
+const screamerOverlay = document.getElementById('screamer-overlay');
+const screamSound = document.getElementById('scream-sound');
 
-const ambientLight = new THREE.AmbientLight(0x404040, 0.2); 
-scene.add(ambientLight);
+// === ИНИЦИАЛИЗАЦИЯ 3D ===
+function init3D() {
+    const canvas = document.getElementById('game-canvas');
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-const flashlight = new THREE.SpotLight(0xffffff, 2);
-flashlight.angle = Math.PI / 6;
-flashlight.penumbra = 0.3;
-flashlight.castShadow = true;
-flashlight.visible = false;
-camera.add(flashlight);
-flashlight.target.position.set(0, 0, -5);
-camera.add(flashlight.target);
-scene.add(camera);
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x010101); // Очень темный фон
+    scene.fog = new THREE.FogExp2(0x010101, 0.12); // Густой туман
 
-// === ГЕНЕРАЦИЯ МИРА ===
-function createWorld() {
-    // Пол (дорога и земля)
-    const floorGeo = new THREE.PlaneGeometry(200, 200);
-    const floorMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
-    const floor = new THREE.Mesh(floorGeo, floorMat);
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 1.7, 0); // Высота человека
+    scene.add(camera);
+
+    // ОСВЕЩЕНИЕ (Исправлено - теперь видно!)
+    // 1. Тусклый общий свет, чтобы не было кромешной тьмы
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.2); 
+    scene.add(ambientLight);
+
+    // 2. Фонарик игрока (Phasmophobia style)
+    const flashlight = new THREE.SpotLight(0xffeedd, 3, 25, Math.PI / 5, 0.5, 1.5);
+    flashlight.castShadow = true;
+    flashlight.position.set(0, 0, 0);
+    camera.add(flashlight);
+    camera.add(flashlight.target);
+    flashlight.target.position.set(0, 0, -1);
+
+    clock = new THREE.Clock();
+    buildLevel();
+    setupControls();
+    
+    // Запуск цикла рендера
+    animate();
+}
+
+// === ГЕНЕРАЦИЯ УРОВНЯ (ПОДВАЛ) ===
+function buildLevel() {
+    // Текстуры материалов (базовые цвета)
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.9 });
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x2c2520, roughness: 1.0 });
+
+    // Пол
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     scene.add(floor);
 
-    // Дорожная разметка
-    for(let i = -100; i < 100; i += 10) {
-        const stripe = new THREE.Mesh(
-            new THREE.PlaneGeometry(0.5, 4),
-            new THREE.MeshBasicMaterial({ color: 0x555500 })
-        );
-        stripe.rotation.x = -Math.PI / 2;
-        stripe.position.set(0, 0.01, i);
-        scene.add(stripe);
-    }
+    // Потолок
+    const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), wallMat);
+    ceiling.rotation.x = Math.PI / 2;
+    ceiling.position.y = 4;
+    scene.add(ceiling);
 
-    // Лес (упрощенные деревья для оптимизации)
-    const treeGeo = new THREE.CylinderGeometry(0.2, 0.4, 6);
-    const treeMat = new THREE.MeshStandardMaterial({ color: 0x050505 });
-    for(let i = 0; i < 150; i++) {
-        const tree = new THREE.Mesh(treeGeo, treeMat);
-        let x = (Math.random() - 0.5) * 100;
-        let z = (Math.random() - 0.5) * 100;
-        if (Math.abs(x) < 7) x += 10; // Очистка дороги
-        tree.position.set(x, 3, z);
-        scene.add(tree);
-        walls.push(tree);
-    }
-
-    // Заброшенный дом (группа объектов)
-    const house = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.BoxGeometry(8, 6, 8), new THREE.MeshStandardMaterial({ color: 0x1a1a1a }));
-    body.position.set(15, 3, -20);
-    house.add(body);
-    walls.push(body);
-    scene.add(house);
-}
-
-// === МОНСТР AI ===
-let monster;
-function createMonster() {
-    const mGroup = new THREE.Group();
-    // Туловище (черный силуэт)
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.3, 3), new THREE.MeshBasicMaterial({ color: 0x000000 }));
-    mGroup.add(body);
-    // Глаза
-    const eyeGeo = new THREE.SphereGeometry(0.05);
-    const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-    const e1 = new THREE.Mesh(eyeGeo, eyeMat); e1.position.set(0.2, 1.2, 0.4);
-    const e2 = new THREE.Mesh(eyeGeo, eyeMat); e2.position.set(-0.2, 1.2, 0.4);
-    mGroup.add(e1, e2);
-    
-    monster = mGroup;
-    monster.position.set(-15, 1.5, -30);
-    scene.add(monster);
-}
-
-function updateMonsterAI(delta) {
-    if (!monster || !STATE.inGame) return;
-
-    const dist = camera.position.distanceTo(monster.position);
-
-    // Логика обнаружения
-    if (dist < 15 && (STATE.isRunning || STATE.upgrades.light > 1)) {
-        STATE.monsterAlert = 1; // Заметил
-    }
-
-    if (STATE.monsterAlert === 1) {
-        monster.lookAt(camera.position.x, 1.5, camera.position.z);
-        monster.translateZ(CONFIG.monsterSpeed + (Math.random() * 0.02));
+    // Функция создания стен с коллизией
+    function createWall(x, z, width, depth) {
+        const geo = new THREE.BoxGeometry(width, 4, depth);
+        const wall = new THREE.Mesh(geo, wallMat);
+        wall.position.set(x, 2, z);
+        wall.castShadow = true;
+        wall.receiveShadow = true;
+        scene.add(wall);
         
-        if (dist < 2) triggerDeath();
-    } else {
-        // Патруль
-        monster.position.x += Math.sin(clock.elapsedTime) * 0.05;
+        // Добавляем невидимую коробку для физики (чтобы не проходить сквозь)
+        const box = new THREE.Box3().setFromObject(wall);
+        wallBoundingBoxes.push(box);
     }
-}
 
-// === КАТСЦЕНА И ГЕЙМПЛЕЙ ===
-async function startIntro() {
-    STATE.inGame = false;
-    document.getElementById('main-menu').classList.add('hidden');
+    // Внешние стены подвала
+    createWall(0, -15, 30, 1); // Передняя
+    createWall(0, 15, 30, 1);  // Задняя
+    createWall(-15, 0, 1, 30); // Левая
+    createWall(15, 0, 1, 30);  // Правая
+
+    // Внутренние стены (Лабиринт для усложнения)
+    createWall(-5, -5, 10, 1);
+    createWall(5, 5, 1, 10);
+    createWall(-10, 8, 5, 1);
+
+    // === ПРЕДМЕТЫ И ИНТЕРАКТИВ ===
+    const itemGeo = new THREE.BoxGeometry(0.4, 0.1, 0.2);
     
-    // Эффект пробуждения
-    camera.position.set(2, 0.2, 10);
-    camera.rotation.x = -0.5;
+    // Ключ 1 (Легкий, на видном месте)
+    const key1Mat = new THREE.MeshStandardMaterial({ color: 0xaaaa00 });
+    const key1 = new THREE.Mesh(itemGeo, key1Mat);
+    key1.position.set(-2, 0.5, -2);
+    key1.userData = { type: 'key', id: 1, name: 'КЛЮЧ ОТ ПОДВАЛА (1/2)' };
+    scene.add(key1);
+
+    // Ключ 2 (Сложный, спрятан за углом)
+    const key2Mat = new THREE.MeshStandardMaterial({ color: 0x00aa00 });
+    const key2 = new THREE.Mesh(itemGeo, key2Mat);
+    key2.position.set(12, 0.1, 12); // В дальнем углу на полу
+    key2.userData = { type: 'key', id: 2, name: 'КЛЮЧ ОТ ПОДВАЛА (2/2)' };
+    scene.add(key2);
+
+    // Выходная дверь
+    const doorGeo = new THREE.BoxGeometry(2, 3.8, 0.2);
+    const doorMat = new THREE.MeshStandardMaterial({ color: 0x4a1515 }); // Красная дверь
+    const door = new THREE.Mesh(doorGeo, doorMat);
+    door.position.set(0, 1.9, -14.8);
+    door.userData = { type: 'door', reqKeys: 2 };
+    scene.add(door);
     
-    await wait(2000);
-    // Камера медленно поднимается
-    let up = setInterval(() => {
-        camera.position.y += 0.01;
-        camera.rotation.x += 0.003;
-        if(camera.position.y >= 1.6) {
-            clearInterval(up);
-            unlockControls();
-        }
-    }, 30);
-
-    // Событие с грузовиком через 10 сек
-    setTimeout(triggerTruckEvent, 10000);
-}
-
-function triggerTruckEvent() {
-    const truck = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 8), new THREE.MeshStandardMaterial({ color: 0x0a0a0a }));
-    const headL = new THREE.PointLight(0xffffff, 10, 20);
-    headL.position.set(0, 1, 4);
-    truck.add(body, headL);
-    truck.position.set(0, 1.5, -60);
-    scene.add(truck);
-
-    let drive = setInterval(() => {
-        truck.position.z += 0.8;
-        if(truck.position.z > camera.position.z - 5) {
-            clearInterval(drive);
-            // Резкий скример
-            document.getElementById('flash-overlay').style.opacity = '1';
-            setTimeout(() => {
-                document.getElementById('flash-overlay').style.opacity = '0';
-                scene.remove(truck);
-                startActualGame();
-            }, 500);
-        }
-    }, 16);
-}
-
-function startActualGame() {
-    STATE.inGame = true;
-    flashlight.visible = true;
-    document.getElementById('hud').style.display = 'block';
-    createMonster();
-}
-
-function triggerDeath() {
-    STATE.isDead = true;
-    STATE.inGame = false;
-    document.exitPointerLock();
-    document.getElementById('death-screen').classList.remove('hidden');
+    // Коллизия двери
+    const doorBox = new THREE.Box3().setFromObject(door);
+    wallBoundingBoxes.push(doorBox);
 }
 
 // === УПРАВЛЕНИЕ ===
-const keys = {};
-document.addEventListener('keydown', e => keys[e.code] = true);
-document.addEventListener('keyup', e => keys[e.code] = false);
+function setupControls() {
+    document.addEventListener('keydown', (e) => {
+        const key = e.key.toLowerCase();
+        if(keys.hasOwnProperty(key)) keys[key] = true;
+    });
+    
+    document.addEventListener('keyup', (e) => {
+        const key = e.key.toLowerCase();
+        if(keys.hasOwnProperty(key)) keys[key] = false;
+    });
 
-function unlockControls() {
-    canvas.addEventListener('click', () => {
-        if(!STATE.isDead) canvas.requestPointerLock();
+    document.addEventListener('mousemove', (e) => {
+        if (document.pointerLockElement === document.body && isGameRunning) {
+            camera.rotation.y -= e.movementX * CONFIG.mouseSens;
+            camera.rotation.x -= e.movementY * CONFIG.mouseSens;
+            // Ограничение камеры по вертикали
+            camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
+        }
+    });
+
+    document.addEventListener('mousedown', () => {
+        if(isGameRunning) document.body.requestPointerLock();
     });
 }
 
-document.addEventListener('mousemove', e => {
-    if (document.pointerLockElement === canvas) {
-        yaw -= e.movementX * 0.002;
-        pitch -= e.movementY * 0.002;
-        pitch = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, pitch));
-    }
-});
+// === ЛОГИКА ИГРЫ ===
+function updatePhysics(delta) {
+    if(!isGameRunning) return;
 
-let yaw = 0, pitch = 0;
-function updateMovement(delta) {
-    if (!STATE.inGame && camera.position.y < 1.5) return;
+    // Стамина
+    let isRunning = keys.shift && stamina > 0 && (keys.w || keys.s || keys.a || keys.d);
+    let targetSpeed = isRunning ? CONFIG.runSpeed : CONFIG.speed;
 
-    camera.rotation.set(pitch, yaw, 0, 'YXZ');
-
-    const speed = (keys['ShiftLeft'] && STATE.stamina > 5) ? 
-        CONFIG.baseSpeed * CONFIG.runMultiplier * STATE.upgrades.speed : 
-        CONFIG.baseSpeed;
-
-    STATE.isRunning = (keys['KeyW'] || keys['KeyS']) && keys['ShiftLeft'] && STATE.stamina > 5;
-
-    if (keys['KeyW']) camera.translateZ(-speed);
-    if (keys['KeyS']) camera.translateZ(speed);
-    if (keys['KeyA']) camera.translateX(-speed);
-    if (keys['KeyD']) camera.translateX(speed);
-
-    // Выносливость
-    if (STATE.isRunning) {
-        STATE.stamina -= CONFIG.staminaDepletion / STATE.upgrades.stamina;
+    if (isRunning) {
+        stamina -= CONFIG.staminaDrain * delta;
     } else {
-        STATE.stamina = Math.min(100, STATE.stamina + CONFIG.staminaRegen);
+        stamina = Math.min(100, stamina + CONFIG.staminaRegen * delta);
     }
-    document.getElementById('stamina-bar').style.width = STATE.stamina + '%';
+    staminaBar.style.width = stamina + '%';
 
-    // Сбор монет (пассивный за выживание)
-    if(STATE.inGame && clock.elapsedTime % 5 < 0.02) {
-        STATE.coins += 1;
-        updateUI();
+    // Вектор направления (Phasmophobia style movement)
+    playerDirection.set(0, 0, 0);
+    if (keys.w) playerDirection.z -= 1;
+    if (keys.s) playerDirection.z += 1;
+    if (keys.a) playerDirection.x -= 1;
+    if (keys.d) playerDirection.x += 1;
+    
+    playerDirection.normalize();
+    playerDirection.applyQuaternion(camera.quaternion);
+    playerDirection.y = 0; // Не летаем
+
+    // Инерция (плавное ускорение/замедление)
+    let targetVelocity = playerDirection.multiplyScalar(targetSpeed);
+    velocity.lerp(targetVelocity, CONFIG.inertia);
+
+    // Сохраняем старую позицию на случай столкновения
+    const oldPosition = camera.position.clone();
+
+    // Двигаем камеру
+    camera.position.addScaledVector(velocity, delta);
+    
+    // Эффект шагов (Head bobbing)
+    if(velocity.lengthSq() > 0.1) {
+        camera.position.y = 1.7 + Math.sin(clock.elapsedTime * (isRunning ? 12 : 8)) * 0.05;
+    } else {
+        camera.position.y = THREE.MathUtils.lerp(camera.position.y, 1.7, 0.1);
+    }
+
+    // === ПРОВЕРКА КОЛЛИЗИЙ (Чтобы не ходить сквозь стены) ===
+    // Создаем хитбокс вокруг игрока
+    playerBox.setFromCenterAndSize(camera.position, new THREE.Vector3(0.6, 2, 0.6));
+    
+    let isColliding = false;
+    for(let box of wallBoundingBoxes) {
+        if(playerBox.intersectsBox(box)) {
+            isColliding = true;
+            break;
+        }
+    }
+
+    // Если столкнулись - отменяем движение
+    if(isColliding) {
+        camera.position.copy(oldPosition);
+        velocity.set(0,0,0);
     }
 }
 
-// === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
-function updateUI() {
-    document.getElementById('menu-coins').innerText = STATE.coins;
-    document.getElementById('game-coins').innerText = STATE.coins;
-    localStorage.setItem('destiny_coins', STATE.coins);
-    localStorage.setItem('destiny_upgrades', JSON.stringify(STATE.upgrades));
+function checkInteraction() {
+    if(!isGameRunning) return;
+
+    // Луч из центра экрана
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+    const intersects = raycaster.intersectObjects(scene.children);
+
+    interactionPrompt.innerText = "";
+    interactionTarget = null;
+
+    if (intersects.length > 0) {
+        const obj = intersects[0].object;
+        const distance = intersects[0].distance;
+
+        if (distance < 2.5 && obj.userData) {
+            interactionTarget = obj;
+            
+            if (obj.userData.type === 'key') {
+                interactionPrompt.innerText = `[E] ПОДОБРАТЬ ${obj.userData.name}`;
+            } 
+            else if (obj.userData.type === 'door') {
+                let keysCount = inventory.length;
+                if(keysCount < obj.userData.reqKeys) {
+                    interactionPrompt.innerText = `НУЖНО КЛЮЧЕЙ: ${keysCount} / ${obj.userData.reqKeys}`;
+                } else {
+                    interactionPrompt.innerText = "[E] ОТКРЫТЬ ДВЕРЬ";
+                }
+            }
+        }
+    }
+
+    // Обработка нажатия E
+    if (keys.e && interactionTarget) {
+        if (interactionTarget.userData.type === 'key') {
+            // Берем ключ
+            inventory.push(interactionTarget.userData.name);
+            scene.remove(interactionTarget);
+            interactionTarget = null;
+            updateInventoryUI();
+            keys.e = false; // защита от залипания
+        } 
+        else if (interactionTarget.userData.type === 'door' && inventory.length >= 2) {
+            // Победа/Переход дальше
+            isGameRunning = false;
+            document.exitPointerLock();
+            triggerScreamer(); // Скример при выходе!
+        }
+    }
 }
 
-function wait(ms) { return new Promise(res => setTimeout(res, ms)); }
+function updateInventoryUI() {
+    inventoryList.innerHTML = "";
+    inventory.forEach(item => {
+        let li = document.createElement('li');
+        li.innerText = "- " + item;
+        inventoryList.appendChild(li);
+    });
+}
+
+function triggerScreamer() {
+    screamerOverlay.classList.remove('hidden');
+    screamSound.play();
+    setTimeout(() => {
+        alert("ВЫ СБЕЖАЛИ ИЗ ПОДВАЛА... НО ВПЕРЕДИ ВЕСЬ ДОМ. (КОНЕЦ ДЕМО)");
+        location.reload();
+    }, 2000);
+}
 
 function animate() {
     requestAnimationFrame(animate);
     const delta = clock.getDelta();
-
-    if (!STATE.isDead) {
-        updateMovement(delta);
-        updateMonsterAI(delta);
-    }
-
+    
+    updatePhysics(delta);
+    checkInteraction();
+    
     renderer.render(scene, camera);
 }
 
-// Кнопки меню
-document.getElementById('btn-play').onclick = startIntro;
-document.getElementById('btn-shop').onclick = () => {
-    document.getElementById('main-menu').classList.add('hidden');
-    document.getElementById('shop-screen').classList.remove('hidden');
+// === ПОСЛЕДОВАТЕЛЬНОСТЬ ЗАПУСКА ===
+document.getElementById('btn-start').onclick = () => {
+    uiMainMenu.classList.add('hidden');
+    uiVideoContainer.classList.remove('hidden');
+    
+    // Запускаем катсцену
+    introVideo.play().catch(e => {
+        // Если браузер заблокировал автоплей
+        console.log("Автоплей заблокирован", e);
+        endCutscene(); 
+    });
+
+    introVideo.onended = endCutscene;
 };
-document.getElementById('btn-back').onclick = () => {
-    document.getElementById('shop-screen').classList.add('hidden');
-    document.getElementById('main-menu').classList.remove('hidden');
-};
 
-// Логика покупки
-document.querySelectorAll('.btn-buy').forEach(btn => {
-    btn.onclick = () => {
-        const item = btn.dataset.item;
-        const price = parseInt(btn.dataset.price);
-        if (STATE.coins >= price && STATE.upgrades[item] < 1.35) {
-            STATE.coins -= price;
-            STATE.upgrades[item] += 0.15;
-            updateUI();
-            alert('Улучшено!');
-        } else {
-            alert('Недостаточно монет или макс. уровень');
-        }
-    };
-});
+function endCutscene() {
+    uiVideoContainer.classList.add('hidden');
+    uiGameHud.classList.remove('hidden');
+    init3D();
+    isGameRunning = true;
+    document.body.requestPointerLock();
+}
 
-// Старт
-createWorld();
-updateUI();
-animate();
-
-// Ресайз
+// Адаптивность при изменении окна
 window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    if(camera && renderer) {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
 });
