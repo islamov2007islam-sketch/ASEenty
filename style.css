@@ -1,86 +1,77 @@
 :root {
     --repo-red: #cc0000;
-    --repo-dark-red: #550000;
-    --repo-bg: #050505;
-    --repo-text: #aaaaaa;
+    --repo-dark: rgba(10, 0, 0, 0.85);
+    --repo-text: #dddddd;
 }
 
 body, html {
     margin: 0; padding: 0; width: 100%; height: 100%;
-    overflow: hidden; background: var(--repo-bg);
+    overflow: hidden; background: #000;
     font-family: 'Courier New', Courier, monospace;
     color: var(--repo-text); user-select: none;
 }
 
-.fullscreen {
-    position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
-    z-index: 10;
-}
-
+.fullscreen { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 10; }
 .hidden { display: none !important; }
 
 #game-canvas { position: absolute; top: 0; left: 0; z-index: 1; outline: none; }
 
-/* Видео катсцены */
-#video-container { background: #000; z-index: 500; display: flex; align-items: center; justify-content: center; }
+/* Видео и Скример */
+#video-container { background: #000; z-index: 500; display: flex; justify-content: center; align-items: center; }
 #intro-video { width: 100%; height: 100%; object-fit: cover; }
-
-/* Скример */
-#screamer-overlay { background: #000; z-index: 1000; display: flex; align-items: center; justify-content: center; }
+#screamer-overlay { background: #000; z-index: 1000; display: flex; justify-content: center; align-items: center; }
 #screamer-img { width: 100%; height: 100%; object-fit: cover; animation: shake 0.1s infinite; }
 
 @keyframes shake {
-    0% { transform: translate(2px, 1px) rotate(0deg); }
-    10% { transform: translate(-1px, -2px) rotate(-1deg); }
-    20% { transform: translate(-3px, 0px) rotate(1deg); }
-    30% { transform: translate(0px, 2px) rotate(0deg); }
-    40% { transform: translate(1px, -1px) rotate(1deg); }
-    50% { transform: translate(-1px, 2px) rotate(-1deg); }
-    60% { transform: translate(-3px, 1px) rotate(0deg); }
-    70% { transform: translate(2px, 1px) rotate(-1deg); }
-    80% { transform: translate(-1px, -1px) rotate(1deg); }
-    90% { transform: translate(2px, 2px) rotate(0deg); }
-    100% { transform: translate(1px, -2px) rotate(-1deg); }
+    0% { transform: translate(2px, 1px) }
+    20% { transform: translate(-3px, 0px) }
+    40% { transform: translate(1px, -1px) }
+    60% { transform: translate(-3px, 1px) }
+    80% { transform: translate(-1px, -1px) }
+    100% { transform: translate(1px, -2px) }
 }
 
-/* Главное меню */
+/* Меню */
 #main-menu {
-    background: radial-gradient(circle, #1a0000 0%, #000000 100%);
-    display: flex; align-items: center; justify-content: center; z-index: 100;
+    background: radial-gradient(circle, #1a0000 0%, #000 100%);
+    display: flex; justify-content: center; align-items: center; z-index: 100;
 }
-
 .menu-content { text-align: center; }
-h1 { font-size: 80px; letter-spacing: 15px; color: var(--repo-red); text-shadow: 0 0 20px var(--repo-red); margin-bottom: 10px; }
-.subtitle { font-size: 12px; color: #555; margin-bottom: 50px; letter-spacing: 2px; }
+h1 { font-size: 80px; letter-spacing: 15px; color: var(--repo-red); text-shadow: 0 0 20px var(--repo-red); margin-bottom: 5px; }
+.subtitle { font-size: 14px; color: #555; margin-bottom: 50px; letter-spacing: 3px; }
 
-.menu-buttons { display: flex; flex-direction: column; gap: 15px; width: 300px; margin: 0 auto; }
+.menu-buttons { display: flex; flex-direction: column; gap: 15px; width: 350px; margin: 0 auto; }
 .repo-btn {
-    background: rgba(0,0,0,0.8); border: 1px solid var(--repo-dark-red);
-    color: var(--repo-red); padding: 15px; font-size: 16px; font-family: inherit;
-    cursor: pointer; letter-spacing: 3px; transition: 0.2s; text-transform: uppercase;
+    background: rgba(0,0,0,0.9); border: 1px solid #550000;
+    color: var(--repo-red); padding: 15px; font-size: 18px; font-family: inherit;
+    cursor: pointer; letter-spacing: 4px; transition: 0.3s;
 }
-.repo-btn:hover { background: var(--repo-red); color: #000; box-shadow: 0 0 15px var(--repo-red); }
+.repo-btn:hover { background: var(--repo-red); color: #000; box-shadow: 0 0 20px var(--repo-red); }
 
-/* Игровой HUD */
+/* HUD в игре */
 #game-hud { pointer-events: none; z-index: 50; }
 
 #crosshair {
-    position: absolute; top: 50%; left: 50%; width: 4px; height: 4px;
-    background: rgba(255, 255, 255, 0.5); border-radius: 50%; transform: translate(-50%, -50%);
+    position: absolute; top: 50%; left: 50%; width: 6px; height: 6px;
+    background: rgba(255, 255, 255, 0.6); border-radius: 50%; transform: translate(-50%, -50%);
 }
 
 #interaction-prompt {
     position: absolute; top: 55%; left: 50%; transform: translateX(-50%);
     color: var(--repo-red); font-size: 18px; font-weight: bold; letter-spacing: 2px;
-    text-shadow: 1px 1px 0 #000;
+    text-align: center; line-height: 1.5; text-shadow: 1px 1px 0 #000;
+}
+
+.repo-box {
+    background: var(--repo-dark); border: 1px solid var(--repo-red);
+    padding: 15px; box-shadow: 0 0 10px rgba(200,0,0,0.2);
 }
 
 #status-panel { position: absolute; bottom: 40px; left: 40px; width: 250px; }
-.stat-block { margin-bottom: 15px; }
-.stat-label { font-size: 12px; color: #888; margin-bottom: 5px; }
-.bar-bg { width: 100%; height: 8px; background: #222; border: 1px solid #444; }
-#stamina-bar { width: 100%; height: 100%; background: var(--repo-red); transition: width 0.1s linear; }
+.stat-label { font-size: 14px; color: #aaa; margin-bottom: 8px; }
+.bar-bg { width: 100%; height: 10px; background: #222; border: 1px solid #555; }
+#stamina-bar { width: 100%; height: 100%; background: var(--repo-red); transition: 0.1s linear; }
 
-#inventory-panel { position: absolute; bottom: 40px; right: 40px; width: 200px; }
-#inventory-list { list-style: none; padding: 0; margin: 0; text-align: right; font-size: 14px; color: #ccc; }
-#inventory-list li { margin-bottom: 5px; }
+#inventory-panel { position: absolute; bottom: 40px; right: 40px; width: 250px; }
+#inventory-list { list-style: none; padding: 0; margin: 0; font-size: 14px; margin-top: 10px; }
+#inventory-list li { margin-bottom: 8px; color: #ddd; }
