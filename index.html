@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DESTINY: THE CELLAR</title>
+    <title>DESTINY: THE ENDLESS NIGHTMARE</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -18,11 +18,11 @@
 
     <div id="main-menu" class="fullscreen">
         <div class="menu-content">
-            <h1 class="glitch" data-text="DESTINY">DESTINY</h1>
+            <h1 class="glitch">DESTINY</h1>
             <p class="subtitle">SYSTEM REQUIRED: WEBGL 2.0</p>
             <div class="menu-buttons">
                 <button id="btn-start" class="repo-btn">ПРИНЯТЬ СУДЬБУ</button>
-                <button id="btn-settings" class="repo-btn">НАСТРОЙКИ</button>
+                <button class="repo-btn" onclick="alert('В разработке')">НАСТРОЙКИ</button>
                 <button class="repo-btn" onclick="window.close()">ВЫХОД</button>
             </div>
         </div>
@@ -33,20 +33,16 @@
         
         <div id="interaction-prompt"></div>
 
-        <div id="status-panel">
-            <div class="stat-block">
-                <div class="stat-label">SYSTEM.STAMINA</div>
-                <div class="bar-bg"><div id="stamina-bar"></div></div>
-            </div>
-            <div class="stat-block">
-                <div class="stat-label">CONDITION: NORMAL</div>
-            </div>
+        <div id="status-panel" class="repo-box">
+            <div class="stat-label">SYSTEM.STAMINA</div>
+            <div class="bar-bg"><div id="stamina-bar"></div></div>
+            <div class="stat-label" style="margin-top:8px;">CONDITION: NORMAL</div>
         </div>
 
-        <div id="inventory-panel">
-            <div class="stat-label" style="text-align: right;">INVENTORY</div>
+        <div id="inventory-panel" class="repo-box">
+            <div class="stat-label" style="border-bottom: 1px solid #cc0000; padding-bottom: 5px;">INVENTORY.LOG</div>
             <ul id="inventory-list">
-                <li style="color: #555;">ПУСТО</li>
+                <li style="color: #666;">- EMPTY -</li>
             </ul>
         </div>
     </div>
