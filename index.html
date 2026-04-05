@@ -1,21 +1,74 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <title>Horror Game</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DESTINY: THE VOID ROAD</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div id="vignette"></div>
+    <div id="noise"></div>
+    <div id="flash-overlay"></div>
 
-<video id="intro" autoplay muted>
-    <source src="assets/intro.mp4" type="video/mp4">
-</video>
+    <div id="main-menu" class="ui-wrapper">
+        <div class="menu-content">
+            <h1 class="glitch" data-text="DESTINY">DESTINY</h1>
+            <div class="menu-stats">МОНЕТЫ: <span id="menu-coins">0</span></div>
+            <nav class="buttons">
+                <button class="btn" id="btn-play">ПРИНЯТЬ СУДЬБУ</button>
+                <button class="btn" id="btn-shop">МАГАЗИН</button>
+                <button class="btn" id="btn-settings">НАСТРОЙКИ</button>
+                <button class="btn" onclick="window.close()">ВЫХОД</button>
+            </nav>
+        </div>
+    </div>
 
-<div id="ui">
-    <p>Выносливость</p>
-    <div id="stamina"></div>
-    <p>Монеты: 10</p>
-</div>
+    <div id="shop-screen" class="ui-wrapper hidden">
+        <div class="menu-content">
+            <h2>ЧЕРНЫЙ РЫНОК</h2>
+            <div class="shop-grid">
+                <div class="shop-item">
+                    <span>ЛИЗОСОМЫ (БЕГ +15%)</span>
+                    <button class="btn-buy" data-item="speed" data-price="50">50 💰</button>
+                </div>
+                <div class="shop-item">
+                    <span>ЛЕГКИЕ (СТАМИНА +20%)</span>
+                    <button class="btn-buy" data-item="stamina" data-price="70">70 💰</button>
+                </div>
+                <div class="shop-item">
+                    <span>ГАЛОГЕН (СВЕТ +30%)</span>
+                    <button class="btn-buy" data-item="light" data-price="100">100 💰</button>
+                </div>
+            </div>
+            <button class="btn" id="btn-back">НАЗАД</button>
+        </div>
+    </div>
 
-<script src="script.js"></script>
+    <div id="hud">
+        <div class="stamina-container">
+            <div id="stamina-bar"></div>
+        </div>
+        <div class="coins-display">💰 <span id="game-coins">0</span></div>
+        <div id="interaction-label"></div>
+    </div>
+
+    <div id="death-screen" class="ui-wrapper hidden">
+        <div class="menu-content">
+            <h2 class="death-title">ВЫ СТАЛИ ЧАСТЬЮ ТЬМЫ</h2>
+            <button class="btn" onclick="location.reload()">ЕЩЕ РАЗ</button>
+        </div>
+    </div>
+
+    <canvas id="game-canvas"></canvas>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+            }
+        }
+    </script>
+    <script type="module" src="script.js"></script>
 </body>
 </html>
