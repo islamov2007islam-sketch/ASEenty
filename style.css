@@ -1,0 +1,17 @@
+body {
+    margin: 0;
+    background: black;
+    color: white;
+}
+
+#intro {
+    width: 100%;
+    height: 100vh;
+    object-fit: cover;
+}
+
+#stamina {
+    width: 200px;
+    height: 10px;
+    background: red;
+}
