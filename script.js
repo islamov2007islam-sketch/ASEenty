@@ -1,341 +1,300 @@
 import * as THREE from 'three';
 
-// === КОНФИГУРАЦИЯ ИГРЫ ===
+// === НАСТРОЙКИ ИГРЫ ===
 const CONFIG = {
-    speed: 4.0,           // Базовая скорость
-    runSpeed: 7.0,        // Скорость бега
-    inertia: 0.15,        // Инерция (Phasmophobia style)
-    mouseSens: 0.002,     // Чувствительность мыши
-    staminaDrain: 20,     // Трата выносливости в секунду
-    staminaRegen: 10      // Восстановление
+    walkSpeed: 4.0,
+    runSpeed: 7.0,
+    inertia: 0.15, // Плавность ходьбы (Phasmophobia)
+    mouseSens: 0.002,
+    staminaDrain: 25,
+    staminaRegen: 15
 };
 
-// === ПЕРЕМЕННЫЕ ===
+// Глобальные переменные
 let scene, camera, renderer, clock;
 let isGameRunning = false;
 let keys = { w: false, a: false, s: false, d: false, shift: false, e: false };
 let velocity = new THREE.Vector3();
-let playerDirection = new THREE.Vector3();
 let stamina = 100;
 let inventory = [];
+
+// Списки для коллизий
+const walls = [];
+const floors = [];
+const interactables = [];
 let interactionTarget = null;
 
-// Коллизии (стены)
-const wallBoundingBoxes = [];
-const playerBox = new THREE.Box3();
-
-// Элементы UI
-const uiMainMenu = document.getElementById('main-menu');
-const uiVideoContainer = document.getElementById('video-container');
-const uiGameHud = document.getElementById('game-hud');
+// UI Элементы
+const uiMenu = document.getElementById('main-menu');
+const uiVideo = document.getElementById('video-container');
+const uiHud = document.getElementById('game-hud');
 const introVideo = document.getElementById('intro-video');
-const interactionPrompt = document.getElementById('interaction-prompt');
+const promptText = document.getElementById('interaction-prompt');
 const staminaBar = document.getElementById('stamina-bar');
 const inventoryList = document.getElementById('inventory-list');
-const screamerOverlay = document.getElementById('screamer-overlay');
-const screamSound = document.getElementById('scream-sound');
 
-// === ИНИЦИАЛИЗАЦИЯ 3D ===
+// === ИНИЦИАЛИЗАЦИЯ ===
 function init3D() {
-    const canvas = document.getElementById('game-canvas');
-    renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('game-canvas'), antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x010101); // Очень темный фон
-    scene.fog = new THREE.FogExp2(0x010101, 0.12); // Густой туман
+    scene.background = new THREE.Color(0x020101);
+    scene.fog = new THREE.FogExp2(0x020101, 0.1);
 
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
-    camera.position.set(0, 1.7, 0); // Высота человека
+    // Спавн в подвале (Y=0)
+    camera.position.set(0, 1.7, 0); 
     scene.add(camera);
 
-    // ОСВЕЩЕНИЕ (Исправлено - теперь видно!)
-    // 1. Тусклый общий свет, чтобы не было кромешной тьмы
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.2); 
-    scene.add(ambientLight);
+    // Свет
+    scene.add(new THREE.AmbientLight(0xffffff, 0.15)); // Чтобы было видно очертания
 
-    // 2. Фонарик игрока (Phasmophobia style)
-    const flashlight = new THREE.SpotLight(0xffeedd, 3, 25, Math.PI / 5, 0.5, 1.5);
+    const flashlight = new THREE.SpotLight(0xfff0dd, 3, 30, Math.PI / 5, 0.5, 1);
     flashlight.castShadow = true;
-    flashlight.position.set(0, 0, 0);
     camera.add(flashlight);
     camera.add(flashlight.target);
     flashlight.target.position.set(0, 0, -1);
 
     clock = new THREE.Clock();
-    buildLevel();
+    buildHouse();
     setupControls();
-    
-    // Запуск цикла рендера
     animate();
 }
 
-// === ГЕНЕРАЦИЯ УРОВНЯ (ПОДВАЛ) ===
-function buildLevel() {
-    // Текстуры материалов (базовые цвета)
-    const floorMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.9 });
-    const wallMat = new THREE.MeshStandardMaterial({ color: 0x2c2520, roughness: 1.0 });
+// === СТРОИТЕЛЬСТВО ДОМА И ПРЕДМЕТОВ ===
+function buildHouse() {
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x1a1515, roughness: 1.0 });
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
 
-    // Пол
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), floorMat);
-    floor.rotation.x = -Math.PI / 2;
-    floor.receiveShadow = true;
-    scene.add(floor);
-
-    // Потолок
-    const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), wallMat);
-    ceiling.rotation.x = Math.PI / 2;
-    ceiling.position.y = 4;
-    scene.add(ceiling);
-
-    // Функция создания стен с коллизией
-    function createWall(x, z, width, depth) {
-        const geo = new THREE.BoxGeometry(width, 4, depth);
-        const wall = new THREE.Mesh(geo, wallMat);
-        wall.position.set(x, 2, z);
-        wall.castShadow = true;
-        wall.receiveShadow = true;
-        scene.add(wall);
-        
-        // Добавляем невидимую коробку для физики (чтобы не проходить сквозь)
-        const box = new THREE.Box3().setFromObject(wall);
-        wallBoundingBoxes.push(box);
+    function addWall(x, y, z, w, h, d) {
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
+        mesh.position.set(x, y + h/2, z);
+        scene.add(mesh);
+        walls.push(new THREE.Box3().setFromObject(mesh));
     }
 
-    // Внешние стены подвала
-    createWall(0, -15, 30, 1); // Передняя
-    createWall(0, 15, 30, 1);  // Задняя
-    createWall(-15, 0, 1, 30); // Левая
-    createWall(15, 0, 1, 30);  // Правая
+    function addFloor(x, y, z, w, d) {
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, 0.2, d), floorMat);
+        mesh.position.set(x, y, z);
+        scene.add(mesh);
+        floors.push(mesh);
+    }
 
-    // Внутренние стены (Лабиринт для усложнения)
-    createWall(-5, -5, 10, 1);
-    createWall(5, 5, 1, 10);
-    createWall(-10, 8, 5, 1);
+    // --- 1. ПОДВАЛ (Y=0) ---
+    addFloor(0, 0, 0, 30, 30); // Пол подвала
+    addWall(0, 0, -15, 30, 5, 1); // Задняя стена
+    addWall(0, 0, 15, 30, 5, 1);  // Передняя
+    addWall(-15, 0, 0, 1, 5, 30); // Левая
+    addWall(15, 0, 0, 1, 5, 30);  // Правая
 
-    // === ПРЕДМЕТЫ И ИНТЕРАКТИВ ===
-    const itemGeo = new THREE.BoxGeometry(0.4, 0.1, 0.2);
+    // --- 2. ПЕРВЫЙ ЭТАЖ (Y=5) ---
+    // Пол с дыркой для лестницы (Лестница будет на X=10)
+    addFloor(-5, 5, 0, 20, 30);
+    addFloor(12.5, 5, 0, 5, 30);
+    addFloor(7.5, 5, -10, 5, 10);
+    addFloor(7.5, 5, 10, 5, 10);
     
-    // Ключ 1 (Легкий, на видном месте)
-    const key1Mat = new THREE.MeshStandardMaterial({ color: 0xaaaa00 });
-    const key1 = new THREE.Mesh(itemGeo, key1Mat);
-    key1.position.set(-2, 0.5, -2);
-    key1.userData = { type: 'key', id: 1, name: 'КЛЮЧ ОТ ПОДВАЛА (1/2)' };
-    scene.add(key1);
+    // Стены первого этажа
+    addWall(0, 5, -15, 30, 5, 1);
+    addWall(0, 5, 15, 30, 5, 1);
+    addWall(-15, 5, 0, 1, 5, 30);
+    addWall(15, 5, 0, 1, 5, 30);
 
-    // Ключ 2 (Сложный, спрятан за углом)
-    const key2Mat = new THREE.MeshStandardMaterial({ color: 0x00aa00 });
-    const key2 = new THREE.Mesh(itemGeo, key2Mat);
-    key2.position.set(12, 0.1, 12); // В дальнем углу на полу
-    key2.userData = { type: 'key', id: 2, name: 'КЛЮЧ ОТ ПОДВАЛА (2/2)' };
-    scene.add(key2);
+    // --- 3. ЛЕСТНИЦА ИЗ ПОДВАЛА НАВЕРХ ---
+    for(let i=0; i<10; i++) {
+        addFloor(7.5, i * 0.5, 4.5 - i, 5, 1); // 10 ступенек
+    }
 
-    // Выходная дверь
-    const doorGeo = new THREE.BoxGeometry(2, 3.8, 0.2);
-    const doorMat = new THREE.MeshStandardMaterial({ color: 0x4a1515 }); // Красная дверь
-    const door = new THREE.Mesh(doorGeo, doorMat);
-    door.position.set(0, 1.9, -14.8);
-    door.userData = { type: 'door', reqKeys: 2 };
-    scene.add(door);
-    
-    // Коллизия двери
-    const doorBox = new THREE.Box3().setFromObject(door);
-    wallBoundingBoxes.push(doorBox);
+    // --- 4. ДВЕРИ ДЛЯ ПОБЕГА ---
+    spawnDoor('ДВЕРЬ ПОДВАЛА', ['КЛЮЧ ПОДВАЛА 1', 'КЛЮЧ ПОДВАЛА 2'], 0, 0, -14.8, 0x331111);
+    spawnDoor('ГЛАВНАЯ ДВЕРЬ', ['ЛОМ', 'КЛЮЧ ОТ ЗАМКА', 'КУСАЧКИ', 'ГЛАВНЫЙ КЛЮЧ'], 0, 5, 14.8, 0x550000);
+
+    // --- 5. ПРЕДМЕТЫ ---
+    spawnItem('КЛЮЧ ПОДВАЛА 1', 0, 0.2, 5, 0x00ff00); // Легкий
+    spawnItem('КЛЮЧ ПОДВАЛА 2', -13, 0.2, 13, 0x00ff00); // Спрятан в углу подвала
+
+    spawnItem('ЛОМ', -13, 5.2, -13, 0xff0000); // Этаж 1
+    spawnItem('КЛЮЧ ОТ ЗАМКА', 13, 5.2, -13, 0xff0000); // Этаж 1
+    spawnItem('КУСАЧКИ', -13, 5.2, 13, 0xff0000); // Этаж 1
+    spawnItem('ГЛАВНЫЙ КЛЮЧ', 0, 5.2, -5, 0xff0000); // Этаж 1 (возле лестницы)
+}
+
+function spawnDoor(name, req, x, y, z, color) {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(3, 4, 0.4), new THREE.MeshStandardMaterial({color}));
+    mesh.position.set(x, y + 2, z);
+    mesh.userData = { isDoor: true, name: name, reqItems: req };
+    scene.add(mesh);
+    interactables.push(mesh);
+    walls.push(new THREE.Box3().setFromObject(mesh)); // Дверь нельзя пройти насквозь
+}
+
+function spawnItem(name, x, y, z, color) {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.2, 0.5), new THREE.MeshStandardMaterial({color, emissive: color, emissiveIntensity: 0.3}));
+    mesh.position.set(x, y, z);
+    mesh.userData = { isItem: true, name: name };
+    scene.add(mesh);
+    interactables.push(mesh);
 }
 
 // === УПРАВЛЕНИЕ ===
 function setupControls() {
-    document.addEventListener('keydown', (e) => {
-        const key = e.key.toLowerCase();
-        if(keys.hasOwnProperty(key)) keys[key] = true;
-    });
+    document.addEventListener('keydown', e => { if(keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = true; });
+    document.addEventListener('keyup', e => { if(keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = false; });
     
-    document.addEventListener('keyup', (e) => {
-        const key = e.key.toLowerCase();
-        if(keys.hasOwnProperty(key)) keys[key] = false;
-    });
+    document.addEventListener('mousedown', () => { if(isGameRunning) document.body.requestPointerLock(); });
 
-    document.addEventListener('mousemove', (e) => {
-        if (document.pointerLockElement === document.body && isGameRunning) {
+    document.addEventListener('mousemove', e => {
+        if (document.pointerLockElement && isGameRunning) {
             camera.rotation.y -= e.movementX * CONFIG.mouseSens;
             camera.rotation.x -= e.movementY * CONFIG.mouseSens;
-            // Ограничение камеры по вертикали
-            camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
+            camera.rotation.x = Math.max(-1.5, Math.min(1.5, camera.rotation.x));
         }
-    });
-
-    document.addEventListener('mousedown', () => {
-        if(isGameRunning) document.body.requestPointerLock();
     });
 }
 
-// === ЛОГИКА ИГРЫ ===
+// === ЛОГИКА ФИЗИКИ И ВЗАИМОДЕЙСТВИЯ ===
 function updatePhysics(delta) {
     if(!isGameRunning) return;
 
     // Стамина
-    let isRunning = keys.shift && stamina > 0 && (keys.w || keys.s || keys.a || keys.d);
-    let targetSpeed = isRunning ? CONFIG.runSpeed : CONFIG.speed;
-
-    if (isRunning) {
-        stamina -= CONFIG.staminaDrain * delta;
-    } else {
-        stamina = Math.min(100, stamina + CONFIG.staminaRegen * delta);
-    }
+    let running = keys.shift && stamina > 0 && (keys.w || keys.s || keys.a || keys.d);
+    let speed = running ? CONFIG.runSpeed : CONFIG.walkSpeed;
+    
+    if (running) stamina -= CONFIG.staminaDrain * delta;
+    else stamina = Math.min(100, stamina + CONFIG.staminaRegen * delta);
     staminaBar.style.width = stamina + '%';
 
-    // Вектор направления (Phasmophobia style movement)
-    playerDirection.set(0, 0, 0);
-    if (keys.w) playerDirection.z -= 1;
-    if (keys.s) playerDirection.z += 1;
-    if (keys.a) playerDirection.x -= 1;
-    if (keys.d) playerDirection.x += 1;
-    
-    playerDirection.normalize();
-    playerDirection.applyQuaternion(camera.quaternion);
-    playerDirection.y = 0; // Не летаем
+    // Вектор ходьбы
+    let dir = new THREE.Vector3();
+    if (keys.w) dir.z -= 1;
+    if (keys.s) dir.z += 1;
+    if (keys.a) dir.x -= 1;
+    if (keys.d) dir.x += 1;
+    dir.normalize().applyQuaternion(camera.quaternion);
+    dir.y = 0;
 
-    // Инерция (плавное ускорение/замедление)
-    let targetVelocity = playerDirection.multiplyScalar(targetSpeed);
-    velocity.lerp(targetVelocity, CONFIG.inertia);
+    velocity.lerp(dir.multiplyScalar(speed), CONFIG.inertia);
 
-    // Сохраняем старую позицию на случай столкновения
-    const oldPosition = camera.position.clone();
+    const oldPos = camera.position.clone();
+    camera.position.x += velocity.x * delta;
+    camera.position.z += velocity.z * delta;
 
-    // Двигаем камеру
-    camera.position.addScaledVector(velocity, delta);
-    
-    // Эффект шагов (Head bobbing)
-    if(velocity.lengthSq() > 0.1) {
-        camera.position.y = 1.7 + Math.sin(clock.elapsedTime * (isRunning ? 12 : 8)) * 0.05;
-    } else {
-        camera.position.y = THREE.MathUtils.lerp(camera.position.y, 1.7, 0.1);
-    }
-
-    // === ПРОВЕРКА КОЛЛИЗИЙ (Чтобы не ходить сквозь стены) ===
-    // Создаем хитбокс вокруг игрока
-    playerBox.setFromCenterAndSize(camera.position, new THREE.Vector3(0.6, 2, 0.6));
-    
-    let isColliding = false;
-    for(let box of wallBoundingBoxes) {
-        if(playerBox.intersectsBox(box)) {
-            isColliding = true;
+    // 1. Коллизии со стенами (Нельзя пройти сквозь)
+    const playerBox = new THREE.Box3().setFromCenterAndSize(camera.position, new THREE.Vector3(0.6, 1.5, 0.6));
+    for(let wBox of walls) {
+        if(playerBox.intersectsBox(wBox)) {
+            camera.position.x = oldPos.x;
+            camera.position.z = oldPos.z;
             break;
         }
     }
 
-    // Если столкнулись - отменяем движение
-    if(isColliding) {
-        camera.position.copy(oldPosition);
-        velocity.set(0,0,0);
+    // 2. Гравитация и лестницы (Лучик вниз проверяет пол)
+    let targetY = 1.7;
+    const rayOrigin = camera.position.clone();
+    rayOrigin.y += 2; // Бросаем луч сверху вниз
+    const downRay = new THREE.Raycaster(rayOrigin, new THREE.Vector3(0, -1, 0));
+    const intersects = downRay.intersectObjects(floors);
+    
+    if(intersects.length > 0) {
+        targetY = intersects[0].point.y + 1.7; // 1.7 = Рост игрока
     }
+    camera.position.y += (targetY - camera.position.y) * 0.2; // Плавный подъем по ступенькам
 }
 
-function checkInteraction() {
+function checkInteractions() {
     if(!isGameRunning) return;
+    
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(new THREE.Vector2(0, 0), camera);
+    const hits = ray.intersectObjects(interactables);
 
-    // Луч из центра экрана
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-    const intersects = raycaster.intersectObjects(scene.children);
-
-    interactionPrompt.innerText = "";
+    promptText.innerText = "";
     interactionTarget = null;
 
-    if (intersects.length > 0) {
-        const obj = intersects[0].object;
-        const distance = intersects[0].distance;
+    if (hits.length > 0 && hits[0].distance < 3) {
+        let obj = hits[0].object;
+        interactionTarget = obj;
 
-        if (distance < 2.5 && obj.userData) {
-            interactionTarget = obj;
+        if(obj.userData.isItem) {
+            promptText.innerText = `[E] ПОДОБРАТЬ: ${obj.userData.name}`;
+        } else if(obj.userData.isDoor) {
+            let req = obj.userData.reqItems;
+            let missing = req.filter(i => !inventory.includes(i));
             
-            if (obj.userData.type === 'key') {
-                interactionPrompt.innerText = `[E] ПОДОБРАТЬ ${obj.userData.name}`;
-            } 
-            else if (obj.userData.type === 'door') {
-                let keysCount = inventory.length;
-                if(keysCount < obj.userData.reqKeys) {
-                    interactionPrompt.innerText = `НУЖНО КЛЮЧЕЙ: ${keysCount} / ${obj.userData.reqKeys}`;
-                } else {
-                    interactionPrompt.innerText = "[E] ОТКРЫТЬ ДВЕРЬ";
-                }
-            }
+            if(missing.length === 0) promptText.innerText = `[E] ОТКРЫТЬ ДВЕРЬ И СБЕЖАТЬ!`;
+            else promptText.innerText = `НУЖНО ПРЕДМЕТОВ: ${req.length - missing.length}/${req.length}\n(Нужен: ${missing[0]})`;
         }
     }
 
-    // Обработка нажатия E
+    // Обработка кнопки E
     if (keys.e && interactionTarget) {
-        if (interactionTarget.userData.type === 'key') {
-            // Берем ключ
+        if (interactionTarget.userData.isItem) {
             inventory.push(interactionTarget.userData.name);
             scene.remove(interactionTarget);
-            interactionTarget = null;
-            updateInventoryUI();
-            keys.e = false; // защита от залипания
+            interactables.splice(interactables.indexOf(interactionTarget), 1);
+            
+            // Обновляем список в UI
+            inventoryList.innerHTML = "";
+            inventory.forEach(item => {
+                let li = document.createElement('li');
+                li.innerText = "> " + item;
+                inventoryList.appendChild(li);
+            });
         } 
-        else if (interactionTarget.userData.type === 'door' && inventory.length >= 2) {
-            // Победа/Переход дальше
-            isGameRunning = false;
-            document.exitPointerLock();
-            triggerScreamer(); // Скример при выходе!
+        else if (interactionTarget.userData.isDoor) {
+            let missing = interactionTarget.userData.reqItems.filter(i => !inventory.includes(i));
+            if(missing.length === 0) triggerWin();
         }
+        keys.e = false;
     }
 }
 
-function updateInventoryUI() {
-    inventoryList.innerHTML = "";
-    inventory.forEach(item => {
-        let li = document.createElement('li');
-        li.innerText = "- " + item;
-        inventoryList.appendChild(li);
-    });
-}
-
-function triggerScreamer() {
-    screamerOverlay.classList.remove('hidden');
-    screamSound.play();
+function triggerWin() {
+    isGameRunning = false;
+    document.exitPointerLock();
+    document.getElementById('screamer-overlay').classList.remove('hidden');
+    document.getElementById('scream-sound').play().catch(()=>{});
+    
     setTimeout(() => {
-        alert("ВЫ СБЕЖАЛИ ИЗ ПОДВАЛА... НО ВПЕРЕДИ ВЕСЬ ДОМ. (КОНЕЦ ДЕМО)");
+        alert("ВЫ СБЕЖАЛИ! ИГРА ПРОЙДЕНА!");
         location.reload();
     }, 2000);
 }
 
 function animate() {
     requestAnimationFrame(animate);
-    const delta = clock.getDelta();
-    
+    const delta = clock?.getDelta() || 0;
     updatePhysics(delta);
-    checkInteraction();
-    
-    renderer.render(scene, camera);
+    checkInteractions();
+    if(renderer) renderer.render(scene, camera);
 }
 
-// === ПОСЛЕДОВАТЕЛЬНОСТЬ ЗАПУСКА ===
+// === ЗАПУСК ИГРЫ И КАТСЦЕНЫ ===
 document.getElementById('btn-start').onclick = () => {
-    uiMainMenu.classList.add('hidden');
-    uiVideoContainer.classList.remove('hidden');
-    
-    // Запускаем катсцену
-    introVideo.play().catch(e => {
-        // Если браузер заблокировал автоплей
-        console.log("Автоплей заблокирован", e);
-        endCutscene(); 
-    });
+    uiMenu.classList.add('hidden');
+    uiVideo.classList.remove('hidden');
 
-    introVideo.onended = endCutscene;
+    // Предохранитель: если видео не найдено, игра всё равно начнется!
+    introVideo.onerror = startGame; 
+    introVideo.onended = startGame;
+
+    introVideo.play().catch(err => {
+        console.warn("Браузер заблокировал автовоспроизведение видео", err);
+        startGame();
+    });
 };
 
-function endCutscene() {
-    uiVideoContainer.classList.add('hidden');
-    uiGameHud.classList.remove('hidden');
+function startGame() {
+    uiVideo.classList.add('hidden');
+    uiHud.classList.remove('hidden');
     init3D();
     isGameRunning = true;
     document.body.requestPointerLock();
 }
 
-// Адаптивность при изменении окна
 window.addEventListener('resize', () => {
     if(camera && renderer) {
         camera.aspect = window.innerWidth / window.innerHeight;
