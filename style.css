@@ -1,70 +1,59 @@
-/* Базовые настройки */
-* { box-sizing: border-box; }
-
-body, html {
-    margin: 0; padding: 0; width: 100%; height: 100%;
-    overflow: hidden; background-color: #000;
-    font-family: 'Courier New', Courier, monospace;
-    color: #aaaaaa;
+:root {
+    --red: #ff0000;
+    --dark-red: #440000;
+    --bg: #050000;
 }
 
-.fullscreen {
-    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-    z-index: 10;
+body, html { margin: 0; padding: 0; background: #000; overflow: hidden; font-family: 'Consolas', monospace; }
+
+.overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    display: flex; justify-content: center; align-items: center;
+    background: radial-gradient(circle, rgba(20,0,0,0.8) 0%, #000 100%);
+    z-index: 100;
 }
 
 .hidden { display: none !important; }
 
-#game-canvas { position: absolute; top: 0; left: 0; z-index: 1; }
-
-/* Эффект Glitch для заголовка */
-h1 {
-    font-size: 70px; color: #cc0000; text-align: center;
-    letter-spacing: 10px; text-shadow: 2px 2px #550000;
+/* Дизайн терминала R.E.P.O */
+.repo-terminal {
+    background: rgba(10, 0, 0, 0.9);
+    border: 2px solid var(--red);
+    padding: 40px;
+    box-shadow: 0 0 30px var(--dark-red);
+    text-align: center;
+    position: relative;
 }
 
-.subtitle { color: #444; font-size: 12px; letter-spacing: 2px; text-align: center; }
-
-/* Кнопки в стиле R.E.P.O */
-.menu-content {
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    height: 100%; background: radial-gradient(circle, #1a0000 0%, #000 100%);
+.repo-terminal::before {
+    content: " "; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: repeating-linear-gradient(rgba(255,0,0,0.03) 0px, transparent 2px);
+    pointer-events: none;
 }
 
-.menu-buttons { display: flex; flex-direction: column; gap: 10px; width: 300px; }
+h1 { font-size: 80px; color: var(--red); margin: 0; letter-spacing: 15px; }
+.line { height: 2px; background: var(--red); margin: 20px 0; }
 
 .repo-btn {
-    background: #000; border: 1px solid #cc0000; color: #cc0000;
-    padding: 15px; cursor: pointer; text-transform: uppercase;
-    font-family: inherit; font-size: 16px; transition: 0.3s;
+    display: block; width: 100%; background: transparent; border: 1px solid var(--red);
+    color: var(--red); padding: 12px; margin: 10px 0; font-family: inherit;
+    cursor: pointer; transition: 0.2s; text-align: left;
 }
 
-.repo-btn:hover { background: #cc0000; color: #000; box-shadow: 0 0 15px #cc0000; }
+.repo-btn:hover { background: var(--red); color: #000; font-weight: bold; }
 
-/* Игровой интерфейс */
-#game-hud { pointer-events: none; z-index: 100; }
+/* HUD */
+#game-hud { position: fixed; width: 100%; height: 100%; pointer-events: none; color: var(--red); }
+#crosshair { position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background: #fff; transform: translate(-50%,-50%); }
 
-#crosshair {
-    position: absolute; top: 50%; left: 50%; width: 4px; height: 4px;
-    background: #fff; border-radius: 50%; transform: translate(-50%, -50%);
-}
+.hud-bottom-left { position: absolute; bottom: 30px; left: 30px; width: 200px; }
+.hud-bottom-right { position: absolute; bottom: 30px; right: 30px; width: 200px; }
 
-.repo-panel {
-    position: absolute; background: rgba(10, 0, 0, 0.8);
-    border: 1px solid #cc0000; padding: 10px;
-}
-
-#status-panel { bottom: 20px; left: 20px; width: 200px; }
-#inventory-panel { bottom: 20px; right: 20px; width: 200px; text-align: right; }
-
-.stat-label { font-size: 10px; color: #cc0000; margin-bottom: 5px; }
-
-.bar-bg { width: 100%; height: 6px; background: #222; }
-#stamina-bar { width: 100%; height: 100%; background: #cc0000; }
-
-#inventory-list { list-style: none; padding: 0; margin: 0; font-size: 12px; }
+.bar-container { width: 100%; height: 4px; background: var(--dark-red); margin-top: 5px; }
+#stamina-bar { height: 100%; width: 100%; background: var(--red); }
+.label { font-size: 12px; letter-spacing: 1px; }
 
 #interaction-prompt {
-    position: absolute; top: 60%; left: 50%; transform: translateX(-50%);
-    color: #cc0000; font-size: 18px; text-shadow: 1px 1px #000;
+    position: absolute; top: 60%; width: 100%; text-align: center;
+    font-size: 20px; text-shadow: 2px 2px #000;
 }
