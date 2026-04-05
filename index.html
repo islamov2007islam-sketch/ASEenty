@@ -2,272 +2,294 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>THE ACCIDENT: 5 DAYS</title>
+    <title>THE ACCIDENT: NIGHTMARE EDITION</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; color: #fff; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #fff; }
         canvas { display: block; }
         
-        /* Меню */
-        #menu, #settings-screen {
-            position: absolute; width: 100%; height: 100%; 
-            background: radial-gradient(circle, #1a0000 0%, #000 100%);
-            display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100;
+        /* Стилизованное меню */
+        #ui-wrapper { position: absolute; width: 100%; height: 100%; z-index: 100; pointer-events: none; }
+        .menu-screen { 
+            pointer-events: all; position: absolute; width: 100%; height: 100%; 
+            background: radial-gradient(circle, rgba(40,0,0,0.4) 0%, rgba(0,0,0,1) 100%);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
         }
-        h1 { font-size: 60px; color: #800; text-shadow: 0 0 10px #f00; margin-bottom: 50px; }
+        h1 { font-size: 80px; letter-spacing: 15px; color: #600; text-shadow: 0 0 30px #f00; margin: 0; text-transform: uppercase; }
+        .buttons { margin-top: 50px; display: flex; flex-direction: column; gap: 20px; }
         .btn {
-            background: none; border: 2px solid #400; color: #888; padding: 15px 40px;
-            font-size: 24px; cursor: pointer; margin: 10px; transition: 0.3s; width: 250px;
+            background: rgba(255,255,255,0.05); border: 1px solid #400; color: #aaa; padding: 20px 60px;
+            font-size: 20px; cursor: pointer; transition: all 0.4s; text-transform: uppercase; letter-spacing: 3px;
         }
-        .btn:hover { background: #400; color: #fff; box-shadow: 0 0 15px #f00; }
-        
-        /* HUD и Текст */
-        #hud { position: absolute; top: 20px; left: 20px; font-size: 20px; z-index: 10; display: none; }
-        #day-screen { 
-            position: absolute; width: 100%; height: 100%; background: #000; 
-            display: none; align-items: center; justify-content: center; font-size: 50px; z-index: 150; 
+        .btn:hover { background: #600; color: #fff; box-shadow: 0 0 50px rgba(255,0,0,0.6); transform: scale(1.05); }
+
+        /* HUD */
+        #hud { position: absolute; bottom: 40px; left: 40px; display: none; pointer-events: none; }
+        .inventory { border-left: 3px solid #600; padding-left: 20px; }
+        #crosshair { 
+            position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; 
+            background: rgba(255,255,255,0.5); border-radius: 50%; transform: translate(-50%, -50%); 
+            display: none;
         }
-        #subtitle { 
-            position: absolute; bottom: 15%; width: 100%; text-align: center; 
-            font-size: 24px; color: #ddd; text-shadow: 2px 2px #000; z-index: 10; pointer-events: none;
-        }
+        #day-label { position: absolute; width: 100%; height: 100%; background: #000; display: none; align-items: center; justify-content: center; font-size: 100px; color: #400; z-index: 200; }
     </style>
 </head>
 <body>
 
-    <div id="day-screen">ДЕНЬ 1</div>
+    <div id="day-label">ДЕНЬ 1</div>
 
-    <div id="menu">
-        <h1>THE ACCIDENT</h1>
-        <button class="btn" onclick="startGame()">ИГРАТЬ</button>
-        <button class="btn" onclick="showSettings()">НАСТРОЙКИ</button>
-        <button class="btn" onclick="window.close()">ВЫХОД</button>
+    <div id="ui-wrapper">
+        <div id="menu" class="menu-screen">
+            <h1>The Accident</h1>
+            <div class="buttons">
+                <button class="btn" onclick="initGame()">Начать Кошмар</button>
+                <button class="btn">Настройки</button>
+                <button class="btn">Выход</button>
+            </div>
+        </div>
+        <div id="crosshair"></div>
+        <div id="hud">
+            <div class="inventory">
+                <div style="font-size: 12px; color: #666;">ИНВЕНТАРЬ</div>
+                <div id="inv-items" style="font-size: 24px;">ПУСТО</div>
+            </div>
+        </div>
     </div>
-
-    <div id="settings-screen" style="display:none;">
-        <h1>НАСТРОЙКИ</h1>
-        <p>Язык: Русский</p>
-        <p>Графика: Оптимизировано для слаб. ПК</p>
-        <p>Звук: 100%</p>
-        <button class="btn" onclick="hideSettings()">НАЗАД</button>
-    </div>
-
-    <div id="hud">ДЕНЬ: <span id="day-val">1</span> | ПРЕДМЕТЫ: <span id="items">НЕТ</span></div>
-    <div id="subtitle"></div>
 
     <script type="module">
         import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js';
 
-        let scene, camera, renderer, clock;
-        let gameState = 'MENU'; // MENU, CUTSCENE, GAME
-        let day = 1;
-        let hasKey = false;
-        let cutsceneTimer = 0;
-
-        // Переменные игрока
+        let scene, camera, renderer, clock, player, controls;
+        let gameState = 'MENU';
         let moveFwd = false, moveBwd = false, moveL = false, moveR = false;
-        const velocity = new THREE.Vector3();
-        const walls = [];
+        let objects = [], walls = [];
         let truck, driver;
+        let cutsceneTime = 0;
 
-        const subtitle = document.getElementById('subtitle');
-
-        function init() {
+        // Инициализация движка
+        function initGame() {
+            document.getElementById('menu').style.display = 'none';
+            document.getElementById('day-label').style.display = 'none';
+            gameState = 'CUTSCENE';
+            
             scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x020202);
+            scene.fog = new THREE.FogExp2(0x020202, 0.05);
+
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             clock = new THREE.Clock();
 
-            renderer = new THREE.WebGLRenderer({ antialias: false });
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
             renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             document.body.appendChild(renderer.domElement);
 
-            window.addEventListener('resize', () => {
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight);
-            });
-
-            setupControls();
-        }
-
-        function setupControls() {
-            document.addEventListener('keydown', (e) => {
-                if(e.code === 'KeyW') moveFwd = true;
-                if(e.code === 'KeyS') moveBwd = true;
-                if(e.code === 'KeyA') moveL = true;
-                if(e.code === 'KeyD') moveR = true;
-            });
-            document.addEventListener('keyup', (e) => {
-                if(e.code === 'KeyW') moveFwd = false;
-                if(e.code === 'KeyS') moveBwd = false;
-                if(e.code === 'KeyA') moveL = false;
-                if(e.code === 'KeyD') moveR = false;
-            });
-            document.addEventListener('mousemove', (e) => {
-                if (document.pointerLockElement === document.body && (gameState === 'GAME' || (gameState === 'CUTSCENE' && cutsceneTimer < 5))) {
-                    camera.rotation.y -= e.movementX * 0.002;
-                }
-            });
-        }
-
-        window.startGame = function() {
-            document.getElementById('menu').style.display = 'none';
+            // Создание окружения кат-сцены
+            createCutsceneWorld();
+            
             document.body.requestPointerLock();
-            startCutscene();
-        };
+            animate();
+        }
 
-        window.showSettings = () => document.getElementById('settings-screen').style.display = 'flex';
-        window.hideSettings = () => document.getElementById('settings-screen').style.display = 'none';
+        window.initGame = initGame;
 
-        function startCutscene() {
-            gameState = 'CUTSCENE';
-            scene.clear();
-            scene.background = new THREE.Color(0x020205);
-            scene.fog = new THREE.Fog(0x020205, 1, 20);
-
-            // Дорога и дерево
-            const roadGeo = new THREE.PlaneGeometry(100, 10);
-            const roadMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+        function createCutsceneWorld() {
+            // Дорога с разметкой
+            const roadGroup = new THREE.Group();
+            const roadGeo = new THREE.PlaneGeometry(200, 15);
+            const roadMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
             const road = new THREE.Mesh(roadGeo, roadMat);
             road.rotation.x = -Math.PI / 2;
-            road.position.z = 15;
-            scene.add(road);
+            road.receiveShadow = true;
+            roadGroup.add(road);
 
-            const grass = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshStandardMaterial({color: 0x050805}));
-            grass.rotation.x = -Math.PI / 2;
-            scene.add(grass);
+            // Разметка
+            for(let i = -100; i < 100; i += 10) {
+                const stripe = new THREE.Mesh(new THREE.PlaneGeometry(4, 0.4), new THREE.MeshBasicMaterial({color: 0x555500}));
+                stripe.rotation.x = -Math.PI / 2;
+                stripe.position.set(i, 0.01, 0);
+                roadGroup.add(stripe);
+            }
+            scene.add(roadGroup);
 
-            const tree = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 5), new THREE.MeshStandardMaterial({color: 0x221100}));
-            tree.position.set(0, 2.5, -2);
+            // Дерево и персонаж
+            const tree = new THREE.Group();
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 6), new THREE.MeshStandardMaterial({color: 0x1a0d00}));
+            trunk.position.y = 3;
+            tree.add(trunk);
+            tree.position.set(0, 0, -10);
             scene.add(tree);
 
-            // Грузовик (коробка)
+            // Грузовик (Детализированный блок)
             truck = new THREE.Group();
-            const body = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 8), new THREE.MeshStandardMaterial({color: 0x330000}));
+            const body = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 8), new THREE.MeshStandardMaterial({color: 0x220000}));
+            body.position.y = 1.8;
             truck.add(body);
-            const headlamp = new THREE.PointLight(0xffffaa, 5, 20);
-            headlamp.position.set(0, 0, 4);
-            truck.add(headlamp);
-            truck.position.set(-50, 1.5, 15);
+            
+            // Фары (Объемный свет)
+            const headlightLeft = new THREE.SpotLight(0xffffff, 50, 40, 0.5, 0.5);
+            headlightLeft.position.set(-1.5, 1.5, 4);
+            headlightLeft.target.position.set(-1.5, 0, 20);
+            truck.add(headlightLeft);
+            truck.add(headlightLeft.target);
+
+            const headlightRight = headlightLeft.clone();
+            headlightRight.position.x = 1.5;
+            headlightRight.target.position.x = 1.5;
+            truck.add(headlightRight);
+            truck.add(headlightRight.target);
+
+            truck.position.set(-80, 0, 0);
             scene.add(truck);
 
-            camera.position.set(0, 0.5, -1); // Лежим под деревом
-            camera.rotation.set(0,0,0);
-            cutsceneTimer = 0;
-            
-            const amb = new THREE.AmbientLight(0x444444);
-            scene.add(amb);
+            camera.position.set(2, 0.4, -8);
+            camera.lookAt(0, 0.5, 0);
+
+            const ambient = new THREE.AmbientLight(0x404040, 0.1);
+            scene.add(ambient);
         }
 
-        function buildHouse() {
+        function buildRealisticHouse() {
             gameState = 'GAME';
             scene.clear();
-            walls.length = 0;
-            scene.background = new THREE.Color(0x050505);
-            scene.fog = new THREE.FogExp2(0x050505, 0.15);
+            walls = [];
+            
+            // Освещение дома
+            const ambient = new THREE.AmbientLight(0x050505);
+            scene.add(ambient);
 
-            const wallMat = new THREE.MeshStandardMaterial({color: 0x332211});
-            const floorMat = new THREE.MeshStandardMaterial({color: 0x111111});
+            // Игрок с фонариком
+            const flashlight = new THREE.SpotLight(0xffffff, 2, 15, 0.4, 0.2, 1);
+            camera.add(flashlight);
+            camera.add(flashlight.target);
+            flashlight.target.position.set(0,0,-5);
+            scene.add(camera);
 
-            // Простой дом
-            const map = [
-                [1,1,1,1,1,1],
-                [1,0,0,0,0,1],
-                [1,0,1,1,0,1],
-                [1,0,0,1,0,1],
-                [1,1,0,0,0,1],
-                [1,1,1,4,1,1] // 4 - Выход
-            ];
-
-            for(let z=0; z<map.length; z++) {
-                for(let x=0; x<map[z].length; x++) {
-                    if(map[z][x] === 1) {
-                        const w = new THREE.Mesh(new THREE.BoxGeometry(4, 4, 4), wallMat);
-                        w.position.set(x*4 - 12, 2, z*4 - 12);
-                        scene.add(w);
-                        walls.push(w);
-                    }
-                }
-            }
-
-            const floor = new THREE.Mesh(new THREE.PlaneGeometry(100,100), floorMat);
-            floor.rotation.x = -Math.PI/2;
+            // Пол (плитка)
+            const floorGeo = new THREE.PlaneGeometry(50, 50);
+            const floorMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.1, metalness: 0.5 });
+            const floor = new THREE.Mesh(floorGeo, floorMat);
+            floor.rotation.x = -Math.PI / 2;
+            floor.receiveShadow = true;
             scene.add(floor);
 
-            const light = new THREE.PointLight(0xffffff, 1, 10);
-            camera.add(light);
-            scene.add(camera);
-            camera.position.set(-8, 1.6, -8);
+            // Генерация комнат
+            createWall(-10, 0, 4, 20, 10); // Левая
+            createWall(10, 0, 4, 20, 10);  // Правая
+            createWall(0, -10, 4, 10, 20); // Задняя
             
+            // Предмет: Ключ
+            const keyGeo = new THREE.TorusGeometry(0.1, 0.05, 8, 16);
+            const keyMat = new THREE.MeshStandardMaterial({color: 0xffd700, metalness: 1});
+            const key = new THREE.Mesh(keyGeo, keyMat);
+            key.position.set(5, 0.5, -5);
+            key.name = "Golden Key";
+            scene.add(key);
+            objects.push(key);
+
+            camera.position.set(0, 1.7, 5);
             document.getElementById('hud').style.display = 'block';
+            document.getElementById('crosshair').style.display = 'block';
+        }
+
+        function createWall(x, z, h, w, d) {
+            const geo = new THREE.BoxGeometry(w, h, d);
+            const mat = new THREE.MeshStandardMaterial({ color: 0x221111 });
+            const wall = new THREE.Mesh(geo, mat);
+            wall.position.set(x, h/2, z);
+            wall.castShadow = true;
+            wall.receiveShadow = true;
+            scene.add(wall);
+            walls.push(wall);
         }
 
         function animate() {
             requestAnimationFrame(animate);
             const delta = clock.getDelta();
 
-            if (gameState === 'CUTSCENE') {
-                cutsceneTimer += delta;
-                if (cutsceneTimer < 3) {
-                    subtitle.innerText = "...Где я? Голова раскалывается...";
-                    camera.position.y = THREE.MathUtils.lerp(camera.position.y, 1.6, 0.02);
-                } else if (cutsceneTimer < 7) {
-                    subtitle.innerText = "Нужно дойти до дороги, может кто поможет.";
-                    camera.position.z += 1.5 * delta;
-                } else if (cutsceneTimer < 11) {
-                    subtitle.innerText = "Никого нет... Тишина пугает.";
-                    // Автоматический осмотр
-                    camera.rotation.y = Math.sin(cutsceneTimer * 2) * 0.5;
-                } else if (cutsceneTimer < 14) {
-                    subtitle.innerText = "ЧТО ЭТО ЗА ЗВУК?!";
-                    truck.position.x += 35 * delta;
-                    if (truck.position.x > -5) {
-                        // УДАР
-                        showDayScreen();
-                        gameState = 'WAIT';
+            if(gameState === 'CUTSCENE') {
+                cutsceneTime += delta;
+                
+                // Сценарий кат-сцены
+                if(cutsceneTime < 4) {
+                    camera.position.y = THREE.MathUtils.lerp(camera.position.y, 1.7, 0.015);
+                    camera.lookAt(0, 1.5, 10);
+                } else if(cutsceneTime < 8) {
+                    camera.position.z += 1.2 * delta;
+                } else if(cutsceneTime < 12) {
+                    truck.position.x += 45 * delta;
+                    if(truck.position.x > -10) {
+                        // Эффект удара
+                        triggerNewDay();
                     }
                 }
             }
 
-            if (gameState === 'GAME') {
-                velocity.x -= velocity.x * 10.0 * delta;
-                velocity.z -= velocity.z * 10.0 * delta;
-
-                direction.z = Number(moveBwd) - Number(moveFwd);
-                direction.x = Number(moveR) - Number(moveL);
-                direction.normalize();
-
-                if (moveFwd || moveBwd) velocity.z -= direction.z * 100.0 * delta;
-                if (moveL || moveR) velocity.x -= direction.x * 100.0 * delta;
-
-                const oldPos = camera.position.clone();
-                camera.translateX(-velocity.x * delta);
-                camera.translateZ(-velocity.z * delta);
-                
-                // Простая проверка коллизий
-                for(let wall of walls) {
-                    if (camera.position.distanceTo(wall.position) < 2.5) {
-                        camera.position.copy(oldPos);
-                    }
-                }
-                camera.position.y = 1.6;
+            if(gameState === 'GAME') {
+                updatePlayer(delta);
             }
 
             renderer.render(scene, camera);
         }
 
-        function showDayScreen() {
-            const screen = document.getElementById('day-screen');
-            screen.style.display = 'flex';
-            screen.innerText = "ДЕНЬ " + day;
-            subtitle.innerText = "";
+        function updatePlayer(delta) {
+            const speed = 5.0;
+            if(moveFwd) camera.translateZ(-speed * delta);
+            if(moveBwd) camera.translateZ(speed * delta);
+            if(moveL) camera.translateX(-speed * delta);
+            if(moveR) camera.translateX(speed * delta);
+
+            // Коллизии
+            for(let wall of walls) {
+                if(camera.position.distanceTo(wall.position) < 4) {
+                   // Простой отскок
+                   camera.position.y = 1.7; 
+                }
+            }
+
+            // Взаимодействие с предметами
+            objects.forEach((obj, index) => {
+                if(camera.position.distanceTo(obj.position) < 1.5) {
+                    document.getElementById('inv-items').innerText = obj.name;
+                    scene.remove(obj);
+                    objects.splice(index, 1);
+                }
+            });
+        }
+
+        function triggerNewDay() {
+            gameState = 'TRANSITION';
+            const dayLabel = document.getElementById('day-label');
+            dayLabel.style.display = 'flex';
             setTimeout(() => {
-                screen.style.display = 'none';
-                buildHouse();
+                dayLabel.style.display = 'none';
+                buildRealisticHouse();
             }, 3000);
         }
 
-        init();
-        animate();
+        // Управление мышью (Стандарт хорроров)
+        document.addEventListener('mousemove', (e) => {
+            if (document.pointerLockElement === document.body) {
+                camera.rotation.y -= e.movementX * 0.002;
+                const pitch = camera.rotation.x - e.movementY * 0.002;
+                camera.rotation.x = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, pitch));
+                camera.rotation.z = 0;
+            }
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if(e.code === 'KeyW') moveFwd = true;
+            if(e.code === 'KeyS') moveBwd = true;
+            if(e.code === 'KeyA') moveL = true;
+            if(e.code === 'KeyD') moveR = true;
+        });
+        window.addEventListener('keyup', (e) => {
+            if(e.code === 'KeyW') moveFwd = false;
+            if(e.code === 'KeyS') moveBwd = false;
+            if(e.code === 'KeyA') moveL = false;
+            if(e.code === 'KeyD') moveR = false;
+        });
+
     </script>
 </body>
 </html>
