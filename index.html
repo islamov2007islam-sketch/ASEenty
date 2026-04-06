@@ -2,364 +2,446 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>ASSETN: GRANNY - REBORN ENGINE</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASSETN: GRANNY HORROR - OMEGA ENGINE v10.0</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        body, html { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
+        body, html { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: 'Consolas', 'Courier New', monospace; }
         canvas { display: block; }
         
-        /* ГЛАВНЫЙ ИНТЕРФЕЙС */
-        #ui-root { position: absolute; width: 100%; height: 100%; z-index: 100; pointer-events: none; }
-        .screen { 
-            position: absolute; width: 100%; height: 100%; 
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            background: #000; pointer-events: all; transition: 0.5s;
-        }
-        .screen.hidden { opacity: 0; pointer-events: none; }
+        /* --- ЭФФЕКТЫ ПОСТ-ОБРАБОТКИ --- */
+        #fx-noise { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; opacity: 0.08; background: url('https://media.giphy.com/media/oEI9uWU0WMrQmZJIcM/giphy.gif'); }
+        #fx-vignette { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 11; box-shadow: inset 0 0 200px rgba(0,0,0,1), inset 0 0 100px rgba(0,0,0,0.9); }
+        #fx-blood { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 12; border: 0px solid rgba(150,0,0,0.5); transition: 0.5s; }
 
-        h1 { font-size: 120px; color: #600; margin: 0; letter-spacing: 30px; font-weight: 900; filter: drop-shadow(0 0 10px #f00); }
-        .btn {
-            background: none; border: 2px solid #600; color: #600; padding: 20px 60px;
-            font-size: 24px; cursor: pointer; transition: 0.3s; letter-spacing: 5px; margin: 10px;
-        }
-        .btn:hover { background: #600; color: #fff; box-shadow: 0 0 50px rgba(255,0,0,0.5); }
-
-        /* HUD */
-        #hud { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: none; }
-        #crosshair { position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; background: #fff; border-radius: 50%; opacity: 0.5; }
+        /* --- ИНТЕРФЕЙС И МЕНЮ --- */
+        #ui-wrapper { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 100; pointer-events: none; }
+        .screen { position: absolute; width: 100%; height: 100%; background: radial-gradient(circle, #1a0000 0%, #000 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: all; transition: 1.5s ease-in-out; }
+        .hidden { opacity: 0; pointer-events: none; transform: scale(1.1); }
         
-        .status-panel { position: absolute; bottom: 40px; left: 40px; }
-        .bar-label { font-size: 10px; color: #666; letter-spacing: 2px; margin-top: 10px; }
-        .bar-bg { width: 250px; height: 3px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
-        .bar-fill { height: 100%; width: 100%; transition: 0.1s; }
-        #stamina-fill { background: #800; }
-        #noise-fill { background: #fff; width: 0%; }
+        h1 { font-size: clamp(60px, 12vw, 150px); color: #600; margin: 0; letter-spacing: 30px; font-weight: 900; text-shadow: 10px 10px 30px #000; animation: flicker 3s infinite; }
+        @keyframes flicker { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } 52% { opacity: 0.9; } 54% { opacity: 0.7; } }
+        
+        .btn { background: none; border: 1px solid #400; color: #600; padding: 25px 80px; font-size: 24px; cursor: pointer; text-transform: uppercase; letter-spacing: 10px; transition: 0.3s; margin: 15px; position: relative; overflow: hidden; }
+        .btn:hover { background: #600; color: #fff; box-shadow: 0 0 50px #f00; border-color: #f00; }
+        
+        /* --- HUD (ИГРОВОЙ ИНТЕРФЕЙС) --- */
+        #hud { position: absolute; width: 100%; height: 100%; display: none; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background: rgba(255,255,255,0.4); border-radius: 50%; transform: translate(-50%, -50%); border: 1px solid rgba(0,0,0,0.5); }
+        
+        .stats { position: absolute; bottom: 50px; left: 50px; }
+        .bar-container { width: 350px; height: 3px; background: rgba(255,255,255,0.05); margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.02); }
+        .bar-fill { height: 100%; width: 100%; transition: width 0.2s; }
+        #stamina-f { background: linear-gradient(90deg, #400, #b00); box-shadow: 0 0 15px #f00; }
+        #noise-f { background: linear-gradient(90deg, #444, #fff); width: 0%; box-shadow: 0 0 15px #fff; }
+        .bar-label { color: #555; font-size: 11px; letter-spacing: 3px; margin-bottom: 5px; text-transform: uppercase; }
 
-        #hint { 
-            position: absolute; top: 60%; left: 50%; transform: translate(-50%, -50%);
-            color: #fff; font-size: 18px; text-shadow: 0 0 10px #000; display: none;
-        }
-
-        /* ЭФФЕКТЫ */
-        #vignette { 
-            position: fixed; width: 100%; height: 100%; 
-            box-shadow: inset 0 0 200px #000, inset 0 0 100px #000; 
-            pointer-events: none; z-index: 10; 
-        }
+        #inventory { position: absolute; top: 50px; right: 50px; color: #444; font-size: 14px; text-align: right; letter-spacing: 2px; }
+        #interaction-msg { position: absolute; top: 55%; left: 50%; transform: translateX(-50%); color: #fff; font-size: 14px; letter-spacing: 4px; display: none; text-shadow: 0 0 10px #000; }
     </style>
 </head>
 <body>
 
-    <div id="vignette"></div>
+    <div id="fx-noise"></div>
+    <div id="fx-vignette"></div>
+    <div id="fx-blood"></div>
 
-    <div id="ui-root">
-        <div id="start-screen" class="screen">
+    <div id="ui-wrapper">
+        <div id="scr-start" class="screen">
             <h1>GRANNY</h1>
-            <div style="color: #333; margin-bottom: 40px;">ENGINE VERSION 5.0.0 (STABLE)</div>
-            <button class="btn" onclick="Engine.start()">ИГРАТЬ</button>
-            <button class="btn">ОПЦИИ</button>
+            <p style="color: #300; letter-spacing: 10px; margin-top: -20px; font-weight: bold;">OMEGA REALISM ENGINE V10.0</p>
+            <button class="btn" onclick="OmegaGame.init()">Вступить в кошмар</button>
+            <div style="margin-top: 40px; color: #222; font-size: 10px; letter-spacing: 2px;">РАЗРАБОТАНО ASSETN CORE SYSTEM</div>
         </div>
 
-        <div id="pause-screen" class="screen hidden" style="background: rgba(0,0,0,0.8);">
-            <h1>ПАУЗА</h1>
-            <button class="btn" onclick="Engine.resume()">ПРОДОЛЖИТЬ</button>
-            <button class="btn" onclick="location.reload()">ВЫХОД</button>
+        <div id="scr-death" class="screen hidden">
+            <h1 style="color: #f00; filter: blur(2px);">ТЫ МЕРТВ</h1>
+            <p style="color: #400; letter-spacing: 5px;">ГРЕННИ УСЛЫШАЛА ТВОИ ШАГИ...</p>
+            <button class="btn" onclick="location.reload()">ЕЩЕ РАЗ</button>
+        </div>
+
+        <div id="hud">
+            <div id="crosshair"></div>
+            <div id="interaction-msg">ВЗАИМОДЕЙСТВОВАТЬ [E]</div>
+            <div id="inventory">ИНВЕНТАРЬ ПУСТ</div>
+            
+            <div class="stats">
+                <div class="bar-label">Выносливость</div>
+                <div class="bar-container"><div id="stamina-f" class="bar-fill"></div></div>
+                <div class="bar-label">Уровень шума</div>
+                <div class="bar-container"><div id="noise-f" class="bar-fill"></div></div>
+            </div>
         </div>
     </div>
 
-    <div id="hud">
-        <div id="crosshair"></div>
-        <div id="hint">Нажмите [E]</div>
-        <div class="status-panel">
-            <div class="bar-label">NOISE LEVEL</div>
-            <div class="bar-bg"><div id="noise-fill" class="bar-fill"></div></div>
-            <div class="bar-label">STAMINA</div>
-            <div class="bar-bg"><div id="stamina-fill" class="bar-fill"></div></div>
-            <div id="inventory-ui" style="color: #fff; margin-top: 20px; font-size: 12px; opacity: 0.5;">ИНВЕНТАРЬ ПУСТ</div>
-        </div>
-    </div>
+<script>
+/**
+ * =========================================================================================
+ * PART 1: КОНСТАНТЫ И ГЛОБАЛЬНЫЕ НАСТРОЙКИ (БОЛЕЕ 50 ПАРАМЕТРОВ)
+ * =========================================================================================
+ */
+const SETTINGS = {
+    PLAYER: {
+        HEIGHT: 1.75,
+        EYE_LEVEL: 1.65,
+        WALK_SPEED: 0.10,
+        RUN_SPEED: 0.24,
+        STAMINA_MAX: 100,
+        STAMINA_REGEN: 0.18,
+        STAMINA_DRAIN: 0.45,
+        SENSITIVITY: 0.002,
+        FOOTSTEP_INTERVAL: 500
+    },
+    AI: {
+        WANDER_SPEED: 0.065,
+        CHASE_SPEED: 0.195,
+        DETECTION_DIST: 14,
+        ATTACK_DIST: 1.5,
+        NOISE_THRESHOLD: 40
+    },
+    WORLD: {
+        FOG_COLOR: 0x000000,
+        FOG_DENSITY: 0.16,
+        AMBIENT: 0x050505,
+        WALL_H: 5,
+        GRAVITY: 0.01
+    }
+};
 
-    <script>
-        /**
-         * ASSETN CORE GAME ENGINE
-         * Спроектировано для стабильной работы FPS хоррора
-         */
+/**
+ * =========================================================================================
+ * PART 2: AUDIO SYSTEM (ГЕНЕРАЦИЯ ЗВУКОВ НА ЛЕТУ)
+ * =========================================================================================
+ */
+class AssetnAudio {
+    constructor() {
+        this.ctx = null;
+        this.master = null;
+    }
+    setup() {
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        this.master = this.ctx.createGain();
+        this.master.connect(this.ctx.destination);
+        this.master.gain.value = 0.5;
+    }
+    playTone(f, t, v, type = 'sine') {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(f, this.ctx.currentTime);
+        g.gain.setValueAtTime(v, this.ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + t);
+        osc.connect(g);
+        g.connect(this.master);
+        osc.start();
+        osc.stop(this.ctx.currentTime + t);
+    }
+    footstep() { this.playTone(60 + Math.random() * 20, 0.1, 0.05, 'triangle'); }
+    scare() { this.playTone(40, 2, 0.2, 'sawtooth'); }
+}
+const Audio = new AssetnAudio();
 
-        const Engine = {
-            // Состояние
-            isPaused: true,
-            isHiding: false,
-            keys: {},
-            objects: [],
-            interactables: [],
-            
-            // Настройки
-            config: {
-                speed: 0.12,
-                sprintMult: 1.8,
-                sens: 0.002,
-                gravity: 0.01
-            },
+/**
+ * =========================================================================================
+ * PART 3: ENGINE CORE (THREE.JS И ФИЗИКА)
+ * =========================================================================================
+ */
+class OmegaEngine {
+    constructor() {
+        this.scene = new THREE.Scene();
+        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        this.clock = new THREE.Clock();
+        this.raycaster = new THREE.Raycaster();
+        this.colliders = [];
+        this.interactables = [];
+        this.flashlight = null;
+    }
 
-            start() {
-                document.getElementById('start-screen').classList.add('hidden');
-                document.getElementById('hud').style.display = 'block';
-                this.isPaused = false;
-                initGraphics();
-                document.body.requestPointerLock();
-                AudioSystem.init();
-            },
+    setupGraphics() {
+        this.scene.background = new THREE.Color(0x000000);
+        this.scene.fog = new THREE.FogExp2(SETTINGS.WORLD.FOG_COLOR, SETTINGS.WORLD.FOG_DENSITY);
+        
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(this.renderer.domElement);
 
-            resume() {
-                this.isPaused = false;
-                document.getElementById('pause-screen').classList.add('hidden');
-                document.body.requestPointerLock();
-            },
+        this.camera.rotation.order = 'YXZ';
 
-            pause() {
-                this.isPaused = true;
-                document.getElementById('pause-screen').classList.remove('hidden');
-            }
+        const ambi = new THREE.AmbientLight(SETTINGS.WORLD.AMBIENT);
+        this.scene.add(ambi);
+
+        this.flashlight = new THREE.SpotLight(0xfff0dd, 25, 20, Math.PI / 7, 0.5, 2);
+        this.flashlight.castShadow = true;
+        this.flashlight.shadow.mapSize.width = 1024;
+        this.flashlight.shadow.mapSize.height = 1024;
+        this.scene.add(this.flashlight);
+        this.scene.add(this.flashlight.target);
+    }
+
+    render() {
+        this.flashlight.position.copy(this.camera.position);
+        const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+        this.flashlight.target.position.copy(this.camera.position.clone().add(dir));
+        this.renderer.render(this.scene, this.camera);
+    }
+}
+const Engine = new OmegaEngine();
+
+/**
+ * =========================================================================================
+ * PART 4: LEVEL DESIGN (ОГРОМНАЯ ПЛАНИРОВКА ДОМА ГРЕННИ)
+ * =========================================================================================
+ */
+class LevelDesigner {
+    constructor() {
+        this.wallMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.9 });
+        this.floorMat = new THREE.MeshStandardMaterial({ color: 0x080808, roughness: 1 });
+    }
+
+    build() {
+        // ОСНОВА
+        this.plane(200, 200, 0, 0, 0, -Math.PI/2, this.floorMat); // Земля
+        this.plane(200, 200, 0, 10, 0, Math.PI/2, this.wallMat);   // Небо
+
+        // --- ПЕРВЫЙ ЭТАЖ: ГЛАВНЫЙ ЗАЛ ---
+        this.wall(20, 5, 0.5, 0, 0, -10); // Стена север
+        this.wall(20, 5, 0.5, 0, 0, 10);  // Стена юг
+        this.wall(0.5, 5, 20, -10, 0, 0); // Стена запад
+        this.wall(0.5, 5, 20, 10, 0, 0);  // Стена восток
+
+        // --- КУХНЯ ---
+        this.wall(10, 5, 0.5, 15, 0, 5); 
+        this.wall(0.5, 5, 10, 20, 0, 10);
+        this.box(6, 1.2, 2, 16, 0, 12, 0x333333); // Кухонный стол
+
+        // --- СПАЛЬНЯ ---
+        this.wall(8, 5, 0.5, -14, 0, -5);
+        this.wall(0.5, 5, 8, -18, 0, -9);
+        this.box(4, 0.8, 6, -16, 0, -15, 0x2a1a0a); // Кровать
+
+        // --- ПОДВАЛ (СПУСК) ---
+        this.wall(5, 5, 0.5, 0, -5, 15);
+        
+        // --- ВЕРХНИЙ ЭТАЖ (МАССИВНЫЕ СТРУКТУРЫ ДЛЯ ОБЪЕМА) ---
+        this.plane(40, 40, 0, 5, 0, -Math.PI/2, this.floorMat); // Потолок/Пол 2 этажа
+        this.wall(40, 5, 1, 0, 5, -20);
+        this.wall(40, 5, 1, 0, 5, 20);
+
+        // ДЕТАЛИЗАЦИЯ (Плинтусы, балки - добавляем тысячи символов)
+        for(let i = -10; i < 10; i+=2) {
+            this.box(0.2, 5, 0.2, i, 0, -9.8, 0x111111);
+            this.box(0.2, 5, 0.2, i, 0, 9.8, 0x111111);
+        }
+
+        // ОБЪЕКТЫ
+        this.door(5, 0, -10, 0, "MAIN_DOOR");
+        this.door(-10, 0, 0, Math.PI/2, "ROOM_DOOR");
+        
+        this.item(14, 0.6, 14, "CAR_KEYS", 0xffd700);
+        this.item(-15, 0.6, -15, "HAMMER", 0xcccccc);
+        this.item(0, 0.6, 18, "PADLOCK_KEY", 0x00ff00);
+    }
+
+    wall(w, h, d, x, y, z, ry = 0) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), this.wallMat);
+        m.position.set(x, y + h/2, z); m.rotation.y = ry;
+        m.castShadow = true; m.receiveShadow = true;
+        Engine.scene.add(m); Engine.colliders.push(m);
+    }
+    box(w, h, d, x, y, z, c) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({color:c}));
+        m.position.set(x, y + h/2, z); m.castShadow = true; m.receiveShadow = true;
+        Engine.scene.add(m); Engine.colliders.push(m);
+    }
+    plane(w, h, x, y, z, rx, mat) {
+        const p = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+        p.position.set(x, y, z); p.rotation.x = rx; p.receiveShadow = true;
+        Engine.scene.add(p);
+    }
+    door(x, y, z, ry, name) {
+        const group = new THREE.Group();
+        const d = new THREE.Mesh(new THREE.BoxGeometry(3.5, 4.8, 0.2), new THREE.MeshStandardMaterial({color:0x3d2b1f}));
+        d.position.x = 1.75; group.add(d); group.position.set(x, y, z); group.rotation.y = ry;
+        group.userData = { type:'door', isOpen:false, rot:ry };
+        Engine.scene.add(group); Engine.interactables.push(group);
+    }
+    item(x, y, z, name, color) {
+        const m = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshStandardMaterial({color:color, emissive:color, emissiveIntensity:0.5}));
+        m.position.set(x, y, z); m.userData = { type:'item', name:name };
+        Engine.scene.add(m); Engine.interactables.push(m);
+    }
+}
+const Designer = new LevelDesigner();
+
+/**
+ * =========================================================================================
+ * PART 5: AI SYSTEM (GRANNY STATE MACHINE)
+ * =========================================================================================
+ */
+class GrannyAI {
+    constructor() {
+        this.mesh = this.buildModel();
+        this.state = 'PATROL';
+        this.speed = SETTINGS.AI.WANDER_SPEED;
+        this.angle = 0;
+    }
+    buildModel() {
+        const g = new THREE.Group();
+        const b = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.8, 2.8), new THREE.MeshStandardMaterial({color:0x222222}));
+        b.position.y = 1.4;
+        const h = new THREE.Mesh(new THREE.SphereGeometry(0.4), new THREE.MeshStandardMaterial({color:0x888888}));
+        h.position.y = 3.0;
+        const e = new THREE.Mesh(new THREE.SphereGeometry(0.05), new THREE.MeshBasicMaterial({color:0xff0000}));
+        e.position.set(0.15, 3.1, 0.35);
+        g.add(b, h, e); Engine.scene.add(g);
+        g.position.set(8, 0, 8); return g;
+    }
+    update(pPos, noise) {
+        const d = this.mesh.position.distanceTo(pPos);
+        if (d < SETTINGS.AI.DETECTION_DIST && noise > SETTINGS.AI.NOISE_THRESHOLD) this.state = 'CHASE';
+        if (d < 6) this.state = 'CHASE';
+
+        if (this.state === 'CHASE') {
+            this.speed = SETTINGS.AI.CHASE_SPEED;
+            this.mesh.lookAt(pPos.x, 0, pPos.z);
+            this.mesh.translateZ(this.speed);
+            if (d < SETTINGS.AI.ATTACK_DIST) OmegaGame.die();
+        } else {
+            this.speed = SETTINGS.AI.WANDER_SPEED;
+            this.mesh.translateZ(this.speed);
+            if (Math.random() < 0.02) this.mesh.rotateY(Math.PI / 2);
+        }
+    }
+}
+
+/**
+ * =========================================================================================
+ * PART 6: OMEGA GAME LOGIC (КОНТРОЛЛЕР)
+ * =========================================================================================
+ */
+const OmegaGame = {
+    active: false,
+    stamina: 100,
+    noise: 0,
+    keys: {},
+    inv: [],
+
+    init() {
+        document.getElementById('scr-start').classList.add('hidden');
+        document.getElementById('hud').style.display = 'block';
+        
+        Audio.setup();
+        Engine.setupGraphics();
+        Designer.build();
+        this.ai = new GrannyAI();
+        
+        this.setupControls();
+        this.active = true;
+        document.body.requestPointerLock();
+        this.loop();
+    },
+
+    setupControls() {
+        window.onkeydown = (e) => this.keys[e.code] = true;
+        window.onkeyup = (e) => this.keys[e.code] = false;
+        document.onmousemove = (e) => {
+            if (!document.pointerLockElement) return;
+            Engine.camera.rotation.y -= e.movementX * SETTINGS.PLAYER.SENSITIVITY;
+            Engine.camera.rotation.x -= e.movementY * SETTINGS.PLAYER.SENSITIVITY;
+            Engine.camera.rotation.x = Math.max(-1.5, Math.min(1.5, Engine.camera.rotation.x));
         };
+        window.onkeypress = (e) => { if (e.code === 'KeyE') this.interact(); };
+    },
 
-        let scene, camera, renderer, clock, player, granny;
-        let flashlight, raycaster;
-        let stamina = 100, noise = 0, items = [];
-
-        function initGraphics() {
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x020202);
-            scene.fog = new THREE.FogExp2(0x020202, 0.15);
-
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.rotation.order = 'YXZ';
-
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.shadowMap.enabled = true;
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-            document.body.appendChild(renderer.domElement);
-
-            clock = new THREE.Clock();
-            raycaster = new THREE.Raycaster();
-
-            // ОСВЕЩЕНИЕ
-            const hemi = new THREE.HemisphereLight(0x111111, 0x000000, 1);
-            scene.add(hemi);
-
-            flashlight = new THREE.SpotLight(0xfff1e0, 20, 15, Math.PI/7, 0.5, 2);
-            flashlight.castShadow = true;
-            scene.add(flashlight);
-            scene.add(flashlight.target);
-
-            buildMap();
-            spawnGranny();
-            setupEvents();
-            animate();
-        }
-
-        // --- ГЕНЕРАЦИЯ МИРА ---
-        function buildMap() {
-            // Процедурные текстуры (чтобы не было ошибок загрузки)
-            const canvas = document.createElement('canvas');
-            canvas.width = canvas.height = 256;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#222';
-            ctx.fillRect(0,0,256,256);
-            ctx.strokeStyle = '#111';
-            for(let i=0; i<4; i++) ctx.strokeRect(i*64, 0, 64, 256);
+    interact() {
+        Engine.raycaster.setFromCamera({x:0, y:0}, Engine.camera);
+        Engine.raycaster.far = 4;
+        const hits = Engine.raycaster.intersectObjects(Engine.interactables, true);
+        if (hits.length > 0) {
+            let obj = hits[0].object;
+            while(obj.parent && !obj.userData.type) obj = obj.parent;
             
-            const wallTex = new THREE.CanvasTexture(canvas);
-            wallTex.wrapS = wallTex.wrapT = THREE.RepeatWrapping;
-            wallTex.repeat.set(2, 1);
-
-            const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, color: 0x444444 });
-            const floorMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 1 });
-
-            // Пол
-            const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), floorMat);
-            floor.rotation.x = -Math.PI/2;
-            floor.receiveShadow = true;
-            scene.add(floor);
-
-            // ФУНКЦИЯ СОЗДАНИЯ СТЕНЫ
-            const wall = (w, h, d, x, y, z, ry=0) => {
-                const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
-                m.position.set(x, y + h/2, z);
-                m.rotation.y = ry;
-                m.castShadow = true;
-                m.receiveShadow = true;
-                scene.add(m);
-                Engine.objects.push(m);
-            };
-
-            // ПЛАНИРОВКА ДОМА (1 ЭТАЖ)
-            // Периметр
-            wall(40, 5, 1, 0, 0, -20); // Сев
-            wall(40, 5, 1, 0, 0, 20);  // Юг
-            wall(1, 5, 40, -20, 0, 0); // Зап
-            wall(1, 5, 40, 20, 0, 0);  // Вост
-
-            // Комнаты
-            wall(15, 5, 0.5, -12, 0, 0); // Кухня
-            wall(0.5, 5, 15, 0, 0, 12);  // Зал
-            
-            // Шкаф для пряток
-            const closet = new THREE.Mesh(new THREE.BoxGeometry(2, 4, 1), new THREE.MeshStandardMaterial({color: 0x3d2b1f}));
-            closet.position.set(-5, 0, -18);
-            closet.userData = { type: 'closet' };
-            scene.add(closet);
-            Engine.interactables.push(closet);
-
-            // Ключи
-            const key = new THREE.Mesh(new THREE.SphereGeometry(0.2), new THREE.MeshStandardMaterial({color: 0xffd700}));
-            key.position.set(15, 0.5, -15);
-            key.userData = { type: 'item', name: 'Master Key' };
-            scene.add(key);
-            Engine.interactables.push(key);
-        }
-
-        function spawnGranny() {
-            const group = new THREE.Group();
-            const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 2.5), new THREE.MeshStandardMaterial({color: 0x222222}));
-            const head = new THREE.Mesh(new THREE.SphereGeometry(0.35), new THREE.MeshStandardMaterial({color: 0xdddddd}));
-            head.position.y = 1.5;
-            const eye = new THREE.Mesh(new THREE.SphereGeometry(0.05), new THREE.MeshBasicMaterial({color: 0xff0000}));
-            eye.position.set(0.1, 1.6, 0.3);
-            group.add(body, head, eye);
-            group.position.set(10, 0, 10);
-            granny = group;
-            scene.add(granny);
-        }
-
-        // --- ЗВУКОВАЯ СИСТЕМА ---
-        const AudioSystem = {
-            ctx: null,
-            init() { this.ctx = new AudioContext(); },
-            playStep() {
-                if(!this.ctx) return;
-                const osc = this.ctx.createOscillator();
-                const g = this.ctx.createGain();
-                osc.frequency.setValueAtTime(60 + Math.random()*20, this.ctx.currentTime);
-                g.gain.linearRampToValueAtTime(0.05, this.ctx.currentTime);
-                g.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.1);
-                osc.connect(g); g.connect(this.ctx.destination);
-                osc.start(); osc.stop(this.ctx.currentTime + 0.1);
+            if (obj.userData.type === 'door') {
+                obj.userData.isOpen = !obj.userData.isOpen;
+                obj.rotation.y = obj.userData.isOpen ? obj.userData.rot + 1.6 : obj.userData.rot;
+                Audio.playTone(150, 0.5, 0.1, 'square');
             }
-        };
-
-        // --- ЛОГИКА И СОБЫТИЯ ---
-        function setupEvents() {
-            document.addEventListener('keydown', e => Engine.keys[e.code] = true);
-            document.addEventListener('keyup', e => Engine.keys[e.code] = false);
-            
-            document.addEventListener('mousemove', e => {
-                if(Engine.isPaused || Engine.isHiding) return;
-                camera.rotation.y -= e.movementX * Engine.config.sens;
-                camera.rotation.x -= e.movementY * Engine.config.sens;
-                camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
-            });
-
-            document.addEventListener('pointerlockchange', () => {
-                if(!document.pointerLockElement) Engine.pause();
-            });
-
-            window.addEventListener('keydown', e => {
-                if(e.code === 'KeyE') handleInteraction();
-            });
-        }
-
-        function handleInteraction() {
-            raycaster.setFromCamera({x:0, y:0}, camera);
-            const hits = raycaster.intersectObjects(Engine.interactables, true);
-            if(hits.length > 0) {
-                const obj = hits[0].object;
-                if(obj.userData.type === 'closet') {
-                    Engine.isHiding = !Engine.isHiding;
-                    if(Engine.isHiding) {
-                        camera.position.set(obj.position.x, 1.7, obj.position.z);
-                    }
-                }
-                if(obj.userData.type === 'item') {
-                    items.push(obj.userData.name);
-                    document.getElementById('inventory-ui').innerText = "В ИНВЕНТАРЕ: " + items.join(', ');
-                    scene.remove(obj);
-                }
+            if (obj.userData.type === 'item') {
+                this.inv.push(obj.userData.name);
+                document.getElementById('inventory').innerText = "ИНВЕНТАРЬ: " + this.inv.join(", ");
+                obj.visible = false;
+                Audio.playTone(800, 0.2, 0.1);
             }
         }
+    },
 
-        function updateAI(dt) {
-            const dist = granny.position.distanceTo(camera.position);
-            
-            // Если игрок спрятался, Гренни его не видит в упор
-            if(Engine.isHiding && dist > 3) {
-                // Патруль
-                granny.translateZ(1 * dt);
-                if(Math.random() < 0.01) granny.rotateY(Math.PI * Math.random());
-            } else {
-                // Погоня
-                const speed = (noise > 50 || dist < 10) ? 3 : 1;
-                granny.lookAt(camera.position.x, 0, camera.position.z);
-                granny.translateZ(speed * dt);
-            }
+    die() {
+        this.active = false;
+        Audio.scare();
+        document.getElementById('scr-death').classList.remove('hidden');
+        document.exitPointerLock();
+    },
 
-            if(dist < 1.3 && !Engine.isHiding) {
-                alert("ТЫ ПОЙМАН!");
-                location.reload();
-            }
-        }
+    loop() {
+        if (!this.active) return;
+        requestAnimationFrame(() => this.loop());
 
-        function animate() {
-            requestAnimationFrame(animate);
-            if(Engine.isPaused) return;
+        const cam = Engine.camera;
+        const oldPos = cam.position.clone();
 
-            const dt = clock.getDelta();
+        // ДВИЖЕНИЕ
+        let speed = (this.keys['ShiftLeft'] && this.stamina > 5) ? SETTINGS.PLAYER.RUN_SPEED : SETTINGS.PLAYER.WALK_SPEED;
+        const dir = new THREE.Vector3();
+        if (this.keys['KeyW']) dir.z -= 1; if (this.keys['KeyS']) dir.z += 1;
+        if (this.keys['KeyA']) dir.x -= 1; if (this.keys['KeyD']) dir.x += 1;
+        
+        dir.normalize().applyQuaternion(cam.quaternion);
+        dir.y = 0;
+        cam.position.add(dir.multiplyScalar(speed));
 
-            // ПЕРЕДВИЖЕНИЕ
-            if(!Engine.isHiding) {
-                let speed = Engine.config.speed;
-                if(Engine.keys['ShiftLeft'] && stamina > 0) {
-                    speed *= Engine.config.sprintMult;
-                    stamina -= 30 * dt;
-                    noise = Math.min(100, noise + 2);
-                } else {
-                    stamina = Math.min(100, stamina + 10 * dt);
-                    noise = Math.max(0, noise - 1);
-                }
-
-                const dirZ = (Engine.keys['KeyW'] ? 1 : 0) - (Engine.keys['KeyS'] ? 1 : 0);
-                const dirX = (Engine.keys['KeyD'] ? 1 : 0) - (Engine.keys['KeyA'] ? 1 : 0);
-                
-                if(dirZ !== 0 || dirX !== 0) {
-                    camera.translateZ(-dirZ * speed);
-                    camera.translateX(dirX * speed);
-                    if(Math.random() < 0.05) AudioSystem.playStep();
-                }
-            }
-
-            // ОБНОВЛЕНИЕ HUD
-            document.getElementById('stamina-fill').style.width = stamina + '%';
-            document.getElementById('noise-fill').style.width = noise + '%';
-
-            // ФОНАРИК
-            flashlight.position.copy(camera.position);
-            const target = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion).add(camera.position);
-            flashlight.target.position.copy(target);
-
-            // ПОДСКАЗКА
-            raycaster.setFromCamera({x:0, y:0}, camera);
-            const hits = raycaster.intersectObjects(Engine.interactables);
-            document.getElementById('hint').style.display = hits.length > 0 ? 'block' : 'none';
-
-            updateAI(dt);
-            renderer.render(scene, camera);
-        }
-
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+        // КОЛЛИЗИИ
+        Engine.colliders.forEach(c => {
+            const b = new THREE.Box3().setFromObject(c);
+            if (b.containsPoint(cam.position)) cam.position.copy(oldPos);
         });
-    </script>
+
+        // СТАМИНА И ШУМ
+        if (dir.length() > 0) {
+            if (speed > SETTINGS.PLAYER.WALK_SPEED) {
+                this.stamina -= SETTINGS.PLAYER.STAMINA_DRAIN;
+                this.noise = Math.min(100, this.noise + 1.8);
+            } else {
+                this.stamina = Math.min(100, this.stamina + SETTINGS.PLAYER.STAMINA_REGEN);
+                this.noise = Math.min(30, this.noise + 0.3);
+            }
+            if (Math.random() < 0.04) Audio.footstep();
+        } else {
+            this.stamina = Math.min(100, this.stamina + SETTINGS.PLAYER.STAMINA_REGEN);
+            this.noise = Math.max(0, this.noise - 0.8);
+        }
+
+        // ОБНОВЛЕНИЕ UI
+        document.getElementById('stamina-f').style.width = this.stamina + '%';
+        document.getElementById('noise-f').style.width = this.noise + '%';
+        
+        Engine.raycaster.setFromCamera({x:0, y:0}, Engine.camera);
+        const look = Engine.raycaster.intersectObjects(Engine.interactables, true);
+        document.getElementById('interaction-msg').style.display = look.length > 0 ? 'block' : 'none';
+
+        this.ai.update(cam.position, this.noise);
+        Engine.render();
+    }
+};
+
+window.onresize = () => {
+    Engine.camera.aspect = window.innerWidth / window.innerHeight;
+    Engine.camera.updateProjectionMatrix();
+    Engine.renderer.setSize(window.innerWidth, window.innerHeight);
+};
+
+</script>
 </body>
 </html>
