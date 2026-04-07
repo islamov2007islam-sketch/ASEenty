@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Stealth Escape</title>
+<script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.js"></script>
+<style>
+body { margin:0; background:#000; }
+</style>
+</head>
+<body>
+
+<script>
+const config = {
+    type: Phaser.AUTO,
+    width: 900,
+    height: 550,
+    physics: {
+        default: 'arcade',
+        arcade: { debug: false }
+    },
+    scene: { create, update }
+};
+
+new Phaser.Game(config);
+
+let player, bot, cursors, walls = [];
+let text, stateText;
+let lastSeen = 0;
+let botState = "patrol";
+
+function create() {
+    const scene = this;
+
+    // игрок
+    player = this.physics.add.rectangle(100, 100, 25, 25, 0x00ffcc);
+    player.body.setCollideWorldBounds(true);
+
+    // бот
+    bot = this.physics.add.rectangle(700, 400, 25, 25, 0xff4444);
+    bot.body.setCollideWorldBounds(true);
+
+    // стены
+    createWall(this, 300, 200, 200, 20);
+    createWall(this, 600, 300, 20, 200);
+    createWall(this, 200, 400, 150, 20);
+    createWall(this, 500, 100, 200, 20);
+
+    this.physics.add.collider(player, walls);
+    this.physics.add.collider(bot, walls);
+
+    cursors = this.input.keyboard.addKeys({
+        up: 'W', down: 'S', left: 'A', right: 'D', shift: 'SHIFT'
+    });
+
+    text = this.add.text(10, 10, "Выживай 30 сек", { font: "20px Arial", fill: "#fff" });
+    stateText = this.add.text(10, 40, "", { font: "16px Arial", fill: "#aaa" });
+
+    this.startTime = this.time.now;
+    this.gameOver = false;
+}
+
+function createWall(scene, x, y, w, h) {
+    let wall = scene.add.rectangle(x, y, w, h, 0x666666);
+    scene.physics.add.existing(wall, true);
+    walls.push(wall);
+}
+
+function update(time) {
+    if (this.gameOver) return;
+
+    // ===== УПРАВЛЕНИЕ =====
+    let speed = cursors.shift.isDown ? 250 : 150;
+
+    player.body.setVelocity(0);
+
+    if (cursors.left.isDown) player.body.setVelocityX(-speed);
+    if (cursors.right.isDown) player.body.setVelocityX(speed);
+    if (cursors.up.isDown) player.body.setVelocityY(-speed);
+    if (cursors.down.isDown) player.body.setVelocityY(speed);
+
+    // ===== ИИ =====
+    let dx = player.x - bot.x;
+    let dy = player.y - bot.y;
+    let dist = Math.sqrt(dx*dx + dy*dy);
+
+    let canSee = dist < 220 && !isBehindWall(bot, player);
+
+    if (canSee) {
+        botState = "chase";
+        lastSeen = time;
+    } else if (time - lastSeen < 2000) {
+        botState = "search";
+    } else {
+        botState = "patrol";
+    }
+
+    if (botState === "chase") {
+        bot.body.setVelocity(dx * 2.2, dy * 2.2);
+    }
+    else if (botState === "search") {
+        bot.body.setVelocity(dx * 1.2, dy * 1.2);
+    }
+    else {
+        if (!bot.moveTime || time > bot.moveTime) {
+            bot.body.setVelocity(
+                Phaser.Math.Between(-80,80),
+                Phaser.Math.Between(-80,80)
+            );
+            bot.moveTime = time + 2000;
+        }
+    }
+
+    stateText.setText("Бот: " + botState);
+
+    // ===== ПОРАЖЕНИЕ =====
+    if (dist < 25) {
+        text.setText("💀 ТЕБЯ ПОЙМАЛИ");
+        this.gameOver = true;
+    }
+
+    // ===== ПОБЕДА =====
+    if (time - this.startTime > 30000) {
+        text.setText("🏆 ТЫ ВЫЖИЛ");
+        this.gameOver = true;
+    }
+}
+
+// проверка "видит ли через стены"
+function isBehindWall(bot, player) {
+    let line = new Phaser.Geom.Line(bot.x, bot.y, player.x, player.y);
+
+    for (let wall of walls) {
+        let bounds = wall.getBounds();
+        if (Phaser.Geom.Intersects.LineToRectangle(line, bounds)) {
+            return true;
+        }
+    }
+    return false;
+}
+</script>
+
+</body>
+</html>
