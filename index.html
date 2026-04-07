@@ -2,18 +2,19 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>ULTRA GAME</title>
+<title>OVERKILL GAME</title>
 <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.js"></script>
 <style>body{margin:0;background:black;}</style>
 </head>
 <body>
 
 <script>
+
 // ================= CONFIG =================
 const config = {
     type: Phaser.AUTO,
-    width: 1000,
-    height: 600,
+    width: 1100,
+    height: 650,
     physics: { default:'arcade', arcade:{debug:false}},
     scene: { create, update }
 };
@@ -21,24 +22,36 @@ const config = {
 new Phaser.Game(config);
 
 // ================= GLOBAL =================
-let player, bots = [], walls = [];
-let keys, ui;
+let player;
+let bots = [];
+let walls = [];
+let items = [];
+let ui;
+
+let keys;
 let gameState = "menu";
-let stamina = 100, fear = 0, noise = 0;
+
+let stamina = 100;
+let health = 100;
+let fear = 0;
+let noise = 0;
+
 let startTime = 0;
 
 // ================= CREATE =================
-function create() {
+function create(){
 
     keys = this.input.keyboard.addKeys({
-        W:'W',A:'A',S:'S',D:'D',SHIFT:'SHIFT'
+        W:'W',A:'A',S:'S',D:'D',
+        SHIFT:'SHIFT', SPACE:'SPACE'
     });
 
-    ui = this.add.text(350,250,"ULTRA GAME\n\nPRESS SPACE",
-    {font:"30px Arial",fill:"#fff"});
+    ui = this.add.text(400,250,
+        "OVERKILL GAME\n\nPRESS SPACE",
+        {font:"28px Arial",fill:"#fff"}
+    );
 
-    // FIX: нормальный запуск
-    this.input.keyboard.on('keydown-SPACE', () => {
+    this.input.keyboard.on("keydown-SPACE",()=>{
         if(gameState==="menu"){
             startGame(this);
         }
@@ -48,38 +61,51 @@ function create() {
 // ================= START =================
 function startGame(scene){
 
-    gameState="play";
+    gameState = "play";
     ui.destroy();
 
+    // PLAYER
     player = scene.physics.add.rectangle(100,100,25,25,0x00ffff);
     player.body.setCollideWorldBounds(true);
 
-    // walls
-    for(let i=0;i<20;i++){
-        let w = scene.add.rectangle(
-            Phaser.Math.Between(50,950),
-            Phaser.Math.Between(50,550),
-            Phaser.Math.Between(100,250),
-            20,0x444444
+    // WALLS
+    for(let i=0;i<25;i++){
+        createWall(scene,
+            Phaser.Math.Between(50,1050),
+            Phaser.Math.Between(50,600),
+            Phaser.Math.Between(100,300),
+            20
         );
-        scene.physics.add.existing(w,true);
-        walls.push(w);
     }
 
     scene.physics.add.collider(player,walls);
 
-    // bots
-    for(let i=0;i<6;i++){
-        let b = scene.physics.add.rectangle(
-            Phaser.Math.Between(400,950),
-            Phaser.Math.Between(200,550),
+    // ITEMS (для прикола добавим)
+    for(let i=0;i<10;i++){
+        let item = scene.add.rectangle(
+            Phaser.Math.Between(100,1000),
+            Phaser.Math.Between(100,600),
+            15,15,0xffff00
+        );
+        scene.physics.add.existing(item,true);
+        items.push(item);
+    }
+
+    // BOTS
+    for(let i=0;i<8;i++){
+        let bot = scene.physics.add.rectangle(
+            Phaser.Math.Between(300,1000),
+            Phaser.Math.Between(200,600),
             25,25,0xff0000
         );
-        b.state="patrol";
-        b.memory=0;
-        bots.push(b);
 
-        scene.physics.add.collider(b,walls);
+        bot.state="patrol";
+        bot.memory=0;
+        bot.speed=Phaser.Math.Between(80,120);
+
+        bots.push(bot);
+
+        scene.physics.add.collider(bot,walls);
     }
 
     ui = scene.add.text(10,10,"",{font:"16px Arial",fill:"#fff"});
@@ -91,15 +117,15 @@ function update(time){
 
     if(gameState!=="play") return;
 
-    // PLAYER
+    // ===== PLAYER =====
     let speed = 150;
 
     if(keys.SHIFT.isDown && stamina>0){
-        speed = 280;
-        stamina -= 0.5;
-        noise = 120;
+        speed = 300;
+        stamina -= 0.6;
+        noise = 150;
     } else {
-        stamina += 0.3;
+        stamina += 0.4;
         noise *= 0.9;
     }
 
@@ -112,65 +138,108 @@ function update(time){
     if(keys.W.isDown) player.body.setVelocityY(-speed);
     if(keys.S.isDown) player.body.setVelocityY(speed);
 
-    // BOTS AI
-    bots.forEach(b=>{
-        let dx = player.x - b.x;
-        let dy = player.y - b.y;
+    // ===== ITEMS =====
+    items.forEach((item,i)=>{
+        let dist = Phaser.Math.Distance.Between(
+            player.x,player.y,item.x,item.y
+        );
+
+        if(dist<20){
+            item.destroy();
+            items.splice(i,1);
+            stamina += 10;
+            health += 5;
+        }
+    });
+
+    // ===== BOTS AI =====
+    bots.forEach(bot=>{
+
+        let dx = player.x - bot.x;
+        let dy = player.y - bot.y;
         let dist = Math.sqrt(dx*dx+dy*dy);
 
-        let see = dist < 200;
-        let hear = dist < noise;
+        let see = dist<220;
+        let hear = dist<noise;
 
         if(see){
-            b.state="chase";
-            b.memory=time;
+            bot.state="chase";
+            bot.memory=time;
         }
         else if(hear){
-            b.state="search";
-            b.memory=time;
+            bot.state="search";
+            bot.memory=time;
         }
-        else if(time-b.memory<3000){
-            b.state="search";
+        else if(time-bot.memory<4000){
+            bot.state="search";
         }
         else{
-            b.state="patrol";
+            bot.state="patrol";
         }
 
-        if(b.state==="chase"){
-            b.body.setVelocity(dx*2.5,dy*2.5);
-            fear += 0.2;
+        if(bot.state==="chase"){
+            bot.body.setVelocity(dx*2.5,dy*2.5);
+            fear += 0.3;
         }
-        else if(b.state==="search"){
-            b.body.setVelocity(dx*1.2,dy*1.2);
+        else if(bot.state==="search"){
+            bot.body.setVelocity(dx*1.2,dy*1.2);
         }
         else{
-            if(!b.move || time>b.move){
-                b.body.setVelocity(
-                    Phaser.Math.Between(-80,80),
-                    Phaser.Math.Between(-80,80)
+            if(!bot.move || time>bot.move){
+                bot.body.setVelocity(
+                    Phaser.Math.Between(-bot.speed,bot.speed),
+                    Phaser.Math.Between(-bot.speed,bot.speed)
                 );
-                b.move=time+2000;
+                bot.move=time+2000;
             }
         }
 
         if(dist<20){
-            gameState="end";
-            ui.setText("💀 CAUGHT\nF5");
+            health -= 1;
         }
     });
 
-    // WIN
-    if(time-startTime>40000){
-        gameState="end";
-        ui.setText("🏆 SURVIVED\nF5");
+    // ===== STATUS =====
+    stamina = Phaser.Math.Clamp(stamina,0,100);
+    health = Phaser.Math.Clamp(health,0,100);
+    fear = Phaser.Math.Clamp(fear,0,100);
+
+    // ===== EFFECTS =====
+    if(fear>60){
+        player.fillColor = 0xffaaaa;
+    } else {
+        player.fillColor = 0x00ffff;
     }
 
+    // ===== LOSE =====
+    if(health<=0){
+        gameState="end";
+        ui.setText("💀 DEAD\nF5");
+    }
+
+    // ===== WIN =====
+    if(time-startTime>60000){
+        gameState="end";
+        ui.setText("🏆 WIN\nF5");
+    }
+
+    // ===== UI =====
     ui.setText(
         "Time: "+Math.floor((time-startTime)/1000)+
+        "\nHP: "+Math.floor(health)+
         "\nStamina: "+Math.floor(stamina)+
-        "\nFear: "+Math.floor(fear)
+        "\nFear: "+Math.floor(fear)+
+        "\nItems: "+items.length
     );
 }
+
+// ================= HELPERS =================
+function createWall(scene,x,y,w,h){
+    let wall = scene.add.rectangle(x,y,w,h,0x333333);
+    scene.physics.add.existing(wall,true);
+    walls.push(wall);
+}
+
 </script>
 
 </body>
